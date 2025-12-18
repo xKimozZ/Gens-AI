@@ -130,6 +130,7 @@ async function designTests() {
             
             displayTestDesign(result.data);
             updateMetrics();
+            renderTestSuitesList();  // Update sidebar immediately
             
             // Show notification badge on Test Suites tab
             document.getElementById('testSuitesTab').innerHTML = '📋 Test Suites <span style="background:#dc3545;color:white;border-radius:10px;padding:2px 6px;font-size:10px;margin-left:5px;">' + savedTestSuites.length + '</span>';
@@ -276,7 +277,7 @@ function renderTestSuitesList() {
                     <button onclick="event.stopPropagation(); deleteTestSuite(${suite.id})" class="delete-btn" style="margin-left: 8px;">🗑️</button>
                 </div>
                 <div style="font-size: 10px; color: #6c757d; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(suite.url)}</div>
-                <div style="font-size: 9px; color: #999;">${testCases.length} tests | ${(suite.data.coverage_score * 100).toFixed(1)}%</div>
+                <div style="font-size: 9px; color: #999;">${testCases.length} tests | ${(suite.data.coverage_score || 0).toFixed(1)}%</div>
             </div>
         `;
     }).join('');
@@ -424,9 +425,9 @@ function displayTestDesignInSuite(data, suiteName, url) {
         <div style="margin-bottom: 15px;">
             <h3 style="margin-bottom: 8px; color: #333;">${escapeHtml(suiteName)}</h3>
             <p style="font-size: 12px; color: #6c757d; margin-bottom: 5px;"><strong>URL:</strong> ${escapeHtml(url)}</p>
-            <p style="font-size: 12px; color: #6c757d;"><strong>Coverage:</strong> ${(data.coverage_score * 100).toFixed(1)}% | <strong>Test Cases:</strong> ${testCases.length}</p>
+            <p style="font-size: 12px; color: #6c757d;"><strong>Coverage:</strong> ${(data.coverage_score || 0).toFixed(1)}% | <strong>Test Cases:</strong> ${testCases.length}</p>
         </div>
-        <div style="max-height: 600px; overflow-y: auto;">
+        <div>
             ${testCasesHtml || '<p style="color: #6c757d;">No test cases generated</p>'}
         </div>
     `;
@@ -490,8 +491,8 @@ function displayTestDesign(data) {
     display.innerHTML = `
         <span class="phase-badge">Phase 2: Test Design Complete</span>
         <h3 style="margin-bottom: 15px;">Generated Test Cases (${testCases.length})</h3>
-        <p style="margin-bottom: 15px; color: #6c757d; font-size: 13px;">Coverage Score: ${(data.coverage_score * 100).toFixed(1)}%</p>
-        <div style="max-height: 600px; overflow-y: auto;">
+        <p style="margin-bottom: 15px; color: #6c757d; font-size: 13px;">Coverage Score: ${(data.coverage_score || 0).toFixed(1)}%</p>
+        <div>
             ${testCasesHtml || '<p style="color: #6c757d;">No test cases generated</p>'}
         </div>
     `;
