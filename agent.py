@@ -241,7 +241,7 @@ class TestingAgent:
             # Works with OpenAI API or compatible endpoints
             from smolagents import OpenAIServerModel
             return OpenAIServerModel(
-                model_id=os.getenv("MODEL_NAME", "gpt-4o-mini"),
+                model_id=os.getenv("MODEL_NAME", "gpt-5o-mini"),
                 api_key=os.getenv("OPENAI_API_KEY"),
                 api_base=os.getenv("API_BASE")
             )
