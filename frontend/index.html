@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Testing Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="main-panel">
+            <h1>🤖 Web Testing Agent</h1>
+            <p class="subtitle">AI-powered test exploration and design</p>
+            
+            <div class="input-section">
+                <input 
+                    type="text" 
+                    id="urlInput" 
+                    placeholder="Enter URL to explore (e.g., https://demo.playwright.dev/todomvc)"
+                    value="https://demo.playwright.dev/todomvc"
+                >
+                <button onclick="exploreUrl()" id="exploreBtn">🔍 Explore</button>
+            </div>
+            
+            <div class="output" id="output">
+                <div style="color: #6c757d; text-align: center; padding: 60px 20px;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🚀</div>
+                    <div style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">Ready to Start</div>
+                    <div style="font-size: 14px;">Enter a URL above to begin exploring and designing tests</div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button onclick="designTests()" id="designBtn" disabled>📋 Design Tests</button>
+                <button onclick="resetAgent()" class="btn-secondary">🔄 Reset</button>
+            </div>
+        </div>
+        
+        <div class="metrics-panel">
+            <h3 style="margin-bottom: 20px; color: #333;">📊 Metrics</h3>
+            
+            <div class="metric-card">
+                <div class="metric-label">Total Response Time</div>
+                <div class="metric-value" id="totalTime">0<span class="metric-unit">s</span></div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-label">Tokens Used</div>
+                <div class="metric-value" id="totalTokens">0<span class="metric-unit">tokens</span></div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-label">Avg Response Time</div>
+                <div class="metric-value" id="avgTime">0<span class="metric-unit">s</span></div>
+            </div>
+            
+            <div id="phaseMetrics"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
