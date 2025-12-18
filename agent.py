@@ -7,17 +7,18 @@ LLM is hot-swappable via MODEL_PROVIDER environment variable.
 import os
 import json
 import time
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Any
 from dataclasses import dataclass, asdict
+from concurrent.futures import ThreadPoolExecutor
 
 from smolagents import (
     Tool,
     CodeAgent,
-    HfApiModel,
     ToolCallingAgent,
 )
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
 
 @dataclass
@@ -63,103 +64,153 @@ class PageExplorerTool(Tool):
     }
     output_type = "string"
     
+    def __init__(self):
+        super().__init__()
+        self.last_result = None  # Cache last exploration result
+    
     def forward(self, url: str) -> str:
         """Execute page exploration"""
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)  # Visible browser
-            page = browser.new_page()
-            
+        # Run async code in a separate thread to avoid event loop conflicts
+        def run_in_thread():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             try:
-                page.goto(url, wait_until="networkidle")
+                return loop.run_until_complete(self._async_forward(url))
+            finally:
+                loop.close()
+        
+        with ThreadPoolExecutor() as executor:
+            future = executor.submit(run_in_thread)
+            try:
+                return future.result(timeout=60)  # 60 second timeout
+            except TimeoutError:
+                return json.dumps({"error": "Page exploration timed out after 60 seconds"})
+    
+    async def _async_forward(self, url: str) -> str:
+        """Async implementation of page exploration"""
+        print(f"[PageExplorer] Starting exploration of {url}")
+        
+        try:
+            async with async_playwright() as p:
+                print(f"[PageExplorer] Launching browser...")
+                browser = await p.chromium.launch(headless=False)
+                page = await browser.new_page()
+                print(f"[PageExplorer] Browser launched, navigating...")
+                
+                # Set page timeout to 30 seconds
+                page.set_default_timeout(30000)
+                
+                # Navigate with timeout
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                print(f"[PageExplorer] Navigation complete, extracting elements...")
                 
                 # Extract comprehensive page data
+                elements = await self._extract_elements(page)
+                print(f"[PageExplorer] Extracted {len(elements)} elements, analyzing structure...")
+                
+                structure = await self._analyze_structure(page)
+                print(f"[PageExplorer] Structure analyzed, closing browser...")
+                
                 result = {
                     "url": url,
-                    "title": page.title(),
-                    "elements": self._extract_elements(page),
-                    "page_structure": self._analyze_structure(page)
+                    "title": await page.title(),
+                    "elements": elements,
+                    "page_structure": structure
                 }
                 
-                browser.close()
+                # Cache result for later access
+                self.last_result = result
+                
+                print(f"[PageExplorer] Returning results (browser will auto-close)")
                 return json.dumps(result, indent=2)
                 
-            except Exception as e:
-                browser.close()
-                return json.dumps({"error": str(e)})
+        except asyncio.TimeoutError as e:
+            print(f"[PageExplorer] Timeout error: {str(e)}")
+            return json.dumps({"error": f"Page load timed out: {str(e)}"})
+        except Exception as e:
+            print(f"[PageExplorer] Error occurred: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return json.dumps({"error": f"Error during exploration: {str(e)}"})
     
-    def _extract_elements(self, page) -> List[Dict]:
+    async def _extract_elements(self, page) -> List[Dict]:
         """Extract interactive elements with smart locators"""
         elements = []
         
-        # Get all interactive elements
+        # Get all interactive elements (reduced for speed)
         interactive_selectors = [
-            "button", "a", "input", "select", "textarea",
-            "[role='button']", "[onclick]", "[type='submit']"
+            "button", "a", "input"
         ]
         
         for selector in interactive_selectors:
-            els = page.query_selector_all(selector)
-            for el in els[:50]:  # Limit to 50 elements per type
-                try:
-                    element_data = {
-                        "tag": el.evaluate("el => el.tagName.toLowerCase()"),
-                        "text": el.inner_text()[:100] if el.inner_text() else "",
-                        "type": el.get_attribute("type") or "",
-                        "id": el.get_attribute("id") or "",
-                        "class": el.get_attribute("class") or "",
-                        "name": el.get_attribute("name") or "",
-                        "placeholder": el.get_attribute("placeholder") or "",
-                        "aria_label": el.get_attribute("aria-label") or "",
-                        "role": el.get_attribute("role") or "",
-                        "href": el.get_attribute("href") or "",
-                        "visible": el.is_visible(),
-                        "locator_strategy": self._determine_best_locator(el)
-                    }
-                    elements.append(element_data)
-                except:
-                    continue
+            try:
+                els = await page.query_selector_all(selector)
+                for el in els[:20]:  # Reduced to 20 elements per type for speed
+                    try:
+                        # Get text content once with timeout
+                        text_content = await asyncio.wait_for(el.inner_text(), timeout=1.0)
+                        
+                        element_data = {
+                            "tag": await el.evaluate("el => el.tagName.toLowerCase()"),
+                            "text": text_content[:100] if text_content else "",
+                            "type": await el.get_attribute("type") or "",
+                            "id": await el.get_attribute("id") or "",
+                            "name": await el.get_attribute("name") or "",
+                            "visible": await el.is_visible(),
+                        }
+                        elements.append(element_data)
+                    except (asyncio.TimeoutError, Exception):
+                        continue
+            except Exception:
+                continue
         
         return elements
     
-    def _determine_best_locator(self, element) -> str:
+    async def _determine_best_locator(self, element) -> str:
         """Determine the most reliable locator for an element"""
         # Priority: testid > id > name > aria-label > text > css
-        test_id = element.get_attribute("data-testid")
+        test_id = await element.get_attribute("data-testid")
         if test_id:
             return f"[data-testid='{test_id}']"
         
-        elem_id = element.get_attribute("id")
+        elem_id = await element.get_attribute("id")
         if elem_id:
             return f"#{elem_id}"
         
-        name = element.get_attribute("name")
+        name = await element.get_attribute("name")
         if name:
             return f"[name='{name}']"
         
-        aria_label = element.get_attribute("aria-label")
+        aria_label = await element.get_attribute("aria-label")
         if aria_label:
             return f"[aria-label='{aria_label}']"
         
-        text = element.inner_text()[:30] if element.inner_text() else None
-        if text:
-            return f"text='{text}'"
+        try:
+            text_content = await element.inner_text()
+            if text_content:
+                text = text_content[:30]
+                return f"text='{text}'"
+        except:
+            pass
         
         return "css=unknown"
     
-    def _analyze_structure(self, page) -> str:
+    async def _analyze_structure(self, page) -> str:
         """Analyze high-level page structure"""
-        return page.evaluate("""() => {
-            const structure = {
-                forms: document.querySelectorAll('form').length,
-                buttons: document.querySelectorAll('button').length,
-                inputs: document.querySelectorAll('input').length,
-                links: document.querySelectorAll('a').length,
-                has_nav: !!document.querySelector('nav'),
-                has_header: !!document.querySelector('header'),
-                has_footer: !!document.querySelector('footer')
-            };
-            return JSON.stringify(structure);
-        }()""")
+        return await page.evaluate("""
+            () => {
+                const structure = {
+                    forms: document.querySelectorAll('form').length,
+                    buttons: document.querySelectorAll('button').length,
+                    inputs: document.querySelectorAll('input').length,
+                    links: document.querySelectorAll('a').length,
+                    has_nav: !!document.querySelector('nav'),
+                    has_header: !!document.querySelector('header'),
+                    has_footer: !!document.querySelector('footer')
+                };
+                return JSON.stringify(structure);
+            }
+        """)
 
 
 class TestingAgent:
@@ -187,16 +238,17 @@ class TestingAgent:
     def _init_model(self, provider: str):
         """Hot-swappable LLM initialization"""
         if provider == "openai":
-            # Works with OpenAI API or compatible endpoints (Ollama, etc.)
+            # Works with OpenAI API or compatible endpoints
             from smolagents import OpenAIServerModel
             return OpenAIServerModel(
                 model_id=os.getenv("MODEL_NAME", "gpt-4o-mini"),
                 api_key=os.getenv("OPENAI_API_KEY"),
-                api_base=os.getenv("API_BASE", "https://api.openai.com/v1")
+                api_base=os.getenv("API_BASE")
             )
         
         elif provider == "huggingface":
-            return HfApiModel(
+            from smolagents import InferenceClientModel
+            return InferenceClientModel(
                 model_id=os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct"),
                 token=os.getenv("HF_TOKEN")
             )
@@ -227,10 +279,14 @@ Use the page_explorer tool to gather data, then summarize:
 
 Be specific and detailed."""
         
-        # Run agent
-        result = self.agent.run(prompt)
+        # Run agent - catch errors since we only need tool output
+        try:
+            result = self.agent.run(prompt)
+        except Exception as e:
+            print(f"⚠️ Agent run had an error (this is OK, we have the tool output): {str(e)[:100]}")
+            result = None
         
-        # Extract metrics (placeholder - smolagents doesn't expose token count easily)
+        # Extract metrics
         elapsed = time.time() - start_time
         metrics = Metrics(
             phase="exploration",
@@ -241,14 +297,84 @@ Be specific and detailed."""
         
         self.metrics_log.append(asdict(metrics))
         
+        # Parse tool output from agent's step logs
+        # The page_explorer tool returns complete JSON regardless of agent completion
+        tool_output = None
+        
+        # Debug: Check agent structure
+        print(f"[DEBUG] Agent has step_logs: {hasattr(self.agent, 'step_logs')}")
+        if hasattr(self.agent, 'step_logs'):
+            print(f"[DEBUG] step_logs is None: {self.agent.step_logs is None}")
+            if self.agent.step_logs is not None:
+                print(f"[DEBUG] step_logs length: {len(self.agent.step_logs)}")
+        
+        # Try multiple parsing strategies
+        if hasattr(self.agent, 'step_logs') and self.agent.step_logs:
+            print(f"[DEBUG] Found {len(self.agent.step_logs)} step logs")
+            for i, step in enumerate(self.agent.step_logs):
+                print(f"[DEBUG] Step {i} type: {type(step).__name__}")
+                
+                # Strategy 1: Check for tool_calls attribute
+                if hasattr(step, 'tool_calls') and step.tool_calls:
+                    print(f"[DEBUG] Step {i} has {len(step.tool_calls)} tool calls")
+                    for j, tool_call in enumerate(step.tool_calls):
+                        if hasattr(tool_call, '__dict__'):
+                            print(f"[DEBUG] Tool call {j} dict: {list(tool_call.__dict__.keys())}")
+                        tool_name = getattr(tool_call, 'name', getattr(tool_call, 'tool_name', None))
+                        print(f"[DEBUG] Tool call {j} name: {tool_name}")
+                        
+                        if tool_name == 'page_explorer':
+                            obs = getattr(tool_call, 'observations', getattr(tool_call, 'output', None))
+                            if obs:
+                                print(f"[DEBUG] Found observations, length: {len(str(obs))}")
+                                try:
+                                    tool_output = json.loads(obs)
+                                    print(f"✓ Extracted {len(tool_output.get('elements', []))} elements from tool output")
+                                    break
+                                except Exception as e:
+                                    print(f"⚠️ Failed to parse: {e}")
+                
+                # Strategy 2: Check if step itself is a dict
+                if isinstance(step, dict):
+                    print(f"[DEBUG] Step {i} is dict with keys: {list(step.keys())}")
+                    if 'tool_calls' in step:
+                        for tool_call in step['tool_calls']:
+                            if tool_call.get('name') == 'page_explorer' or tool_call.get('tool_name') == 'page_explorer':
+                                obs = tool_call.get('observations') or tool_call.get('output')
+                                if obs:
+                                    try:
+                                        tool_output = json.loads(obs)
+                                        print(f"✓ Extracted {len(tool_output.get('elements', []))} elements")
+                                        break
+                                    except Exception as e:
+                                        print(f"⚠️ Parse failed: {e}")
+                
+                if tool_output:
+                    break
+        
+        # Strategy 3: Access tool's cached result directly
+        if not tool_output and hasattr(self.explorer_tool, 'last_result') and self.explorer_tool.last_result:
+            tool_output = self.explorer_tool.last_result
+            print(f"✓ Retrieved cached result from tool with {len(tool_output.get('elements', []))} elements")
+        
         # Parse exploration data
-        exploration_data = {
-            "url": url,
-            "title": "Explored Page",  # Extract from tool result
-            "elements": [],  # Parse from tool output
-            "structure": str(result),
-            "metrics": metrics
-        }
+        if tool_output and "url" in tool_output:
+            exploration_data = {
+                "url": tool_output.get("url", url),
+                "title": tool_output.get("title", "Unknown"),
+                "elements": tool_output.get("elements", []),
+                "structure": tool_output.get("page_structure", "{}"),
+                "metrics": metrics
+            }
+        else:
+            print(f"⚠️ Could not extract tool output, using fallback")
+            exploration_data = {
+                "url": url,
+                "title": "Explored Page",
+                "elements": [],
+                "structure": str(result) if result else "No data available",
+                "metrics": metrics
+            }
         
         print(f"✅ Exploration complete in {elapsed:.2f}s")
         return ExplorationResult(**exploration_data)
