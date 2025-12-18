@@ -75,14 +75,6 @@ async def root():
     return FileResponse("frontend/index.html")
 
 
-@app.get("/{file_path:path}")
-async def serve_static(file_path: str):
-    """Serve CSS/JS files"""
-    if file_path in ["style.css", "script.js"]:
-        return FileResponse(f"frontend/{file_path}")
-    return {"error": "Not found"}
-
-
 @app.post("/api/explore")
 async def explore_page(request: ExploreRequest) -> AgentResponse:
     """
@@ -223,6 +215,15 @@ async def health_check():
         "status": "healthy",
         "model_provider": os.getenv("MODEL_PROVIDER", "huggingface")
     }
+
+
+# Static file serving - MUST be last to not override API routes
+@app.get("/{file_path:path}")
+async def serve_static(file_path: str):
+    """Serve CSS/JS files"""
+    if file_path in ["style.css", "script.js"]:
+        return FileResponse(f"frontend/{file_path}")
+    return {"error": "Not found", "path": file_path}
 
 
 if __name__ == "__main__":
