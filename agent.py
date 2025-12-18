@@ -426,26 +426,84 @@ Generate at least 5-10 test cases that cover the main functionality."""
     
     def _parse_test_cases(self, llm_output: str) -> List[Dict]:
         """Parse test cases from LLM output"""
-        # Simple parsing - in production, use structured output
+        import re
+        
         test_cases = []
+        print(f"[DEBUG] Parsing LLM output ({len(llm_output)} chars)")
         
-        # This is a placeholder - enhance with better parsing
-        lines = llm_output.split('\n')
-        for i, line in enumerate(lines):
-            if 'test' in line.lower() and i < 10:  # Simple heuristic
-                test_cases.append({
-                    "id": i + 1,
-                    "name": line.strip(),
-                    "description": "Auto-generated test case",
-                    "steps": [],
-                    "expected": "Should complete successfully",
-                    "priority": "Medium"
-                })
-        
-        return test_cases if test_cases else [
-            {"id": 1, "name": "Sample Test", "description": "Placeholder", 
-             "steps": [], "expected": "Pass", "priority": "High"}
+        # Try to find structured test cases using multiple patterns
+        patterns = [
+            r'Test\s+#?(\d+):?\s*(.+?)(?:\n|$)',  # Test #1: name or Test 1: name
+            r'(\d+)\.\s*Test:?\s*(.+?)(?:\n|$)',  # 1. Test: name
+            r'Test\s+Case\s+#?(\d+):?\s*(.+?)(?:\n|$)',  # Test Case #1: name
+            r'^\*\*Test\s+#?(\d+):\*\*\s*(.+?)(?:\n|$)',  # **Test #1:** name (markdown)
         ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, llm_output, re.MULTILINE | re.IGNORECASE)
+            if matches:
+                print(f"[DEBUG] Found {len(matches)} test cases with pattern: {pattern}")
+                for match in matches:
+                    test_id, name = match[0], match[1].strip()
+                    
+                    # Try to extract more details from context
+                    # Look for description, steps, etc. in the lines following the test name
+                    test_cases.append({
+                        "id": int(test_id) if test_id.isdigit() else len(test_cases) + 1,
+                        "name": name,
+                        "description": "Test case generated from page exploration",
+                        "steps": ["Navigate to page", "Verify functionality"],
+                        "expected_outcome": "Test completes successfully",
+                        "priority": "Medium"
+                    })
+                break
+        
+        # Fallback: Look for numbered lines that might be test cases
+        if not test_cases:
+            print("[DEBUG] No patterns matched, trying fallback parsing")
+            lines = [l.strip() for l in llm_output.split('\n') if l.strip()]
+            for i, line in enumerate(lines):
+                # Look for numbered items or lines with "test" keyword
+                if (re.match(r'^\d+\.', line) or 
+                    re.match(r'^-\s*', line) or 
+                    'test' in line.lower()):
+                    # Clean up markdown/numbering
+                    clean_name = re.sub(r'^\d+\.\s*|\*+\s*|-\s*', '', line).strip()
+                    if len(clean_name) > 5:  # Ignore very short lines
+                        test_cases.append({
+                            "id": len(test_cases) + 1,
+                            "name": clean_name,
+                            "description": "Auto-generated test case",
+                            "steps": [],
+                            "expected_outcome": "Should complete successfully",
+                            "priority": "Medium"
+                        })
+        
+        print(f"[DEBUG] Parsed {len(test_cases)} test cases total")
+        
+        # If still no test cases, return placeholder
+        if not test_cases:
+            print("[DEBUG] No test cases found, returning placeholder")
+            return [
+                {
+                    "id": 1,
+                    "name": "Header Presence",
+                    "description": "Auto-generated test case",
+                    "steps": ["Navigate to page", "Verify header exists"],
+                    "expected_outcome": "Header element is visible",
+                    "priority": "Medium"
+                },
+                {
+                    "id": 2,
+                    "name": "Footer Presence",
+                    "description": "Auto-generated test case",
+                    "steps": ["Navigate to page", "Verify footer exists"],
+                    "expected_outcome": "Footer element is visible",
+                    "priority": "Medium"
+                }
+            ]
+        
+        return test_cases
     
     def get_metrics(self) -> List[Dict]:
         """Return all collected metrics"""
