@@ -370,3 +370,20 @@ button:disabled {
     white-space: pre-wrap;
     word-break: break-all;
 }
+
+/* Review mode toggle buttons */
+.review-mode-btn {
+    transition: all 0.2s ease;
+}
+
+.review-mode-btn:hover {
+    opacity: 0.9;
+}
+
+.editable-test {
+    transition: box-shadow 0.2s ease;
+}
+
+.editable-test:hover {
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}

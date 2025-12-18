@@ -124,7 +124,10 @@ async def design_tests(request: Dict[str, Any]) -> AgentResponse:
                           response_time=0, timestamp="")
         )
         
-        result = agent_instance.design_tests(exploration)
+        # Get desired test count
+        desired_count = request.get("desired_test_count", 12)
+        
+        result = agent_instance.design_tests(exploration, desired_count)
         
         return AgentResponse(
             success=True,
@@ -154,16 +157,100 @@ async def chat(message: ChatMessage) -> AgentResponse:
     Can handle follow-up questions or refinement requests.
     """
     try:
-        # Use agent to process message
-        response = agent_instance.agent.run(message.message)
+        import time
+        start = time.time()
+        
+        # Build context-aware prompt WITHOUT tool calling
+        import json
+        context = message.context
+        test_cases = context.get('test_cases', [])
+        elements = context.get('elements', [])
+        structure = context.get('structure', '')
+        
+        # Format elements for AI
+        elements_summary = "\n".join([f"- {el.get('tag', 'element')} (id='{el.get('id', '')}', text='{el.get('text', '')[:30]}')" 
+                                      for el in elements[:20]])
+        
+        system_prompt = f"""You are a test design assistant with access to page structure.
+
+URL: {context.get('url', 'unknown')}
+Page Structure: {structure}
+Visible Elements:
+{elements_summary}
+
+Current test suite has {len(test_cases)} tests.
+
+When user asks to add/modify/delete tests:
+1. Generate/modify the test cases based on available elements
+2. Return response in this EXACT format:
+
+<RESPONSE>
+Done! I [describe what you did].
+</RESPONSE>
+
+<TEST_CASES>
+[Return complete JSON array of test cases]
+</TEST_CASES>
+
+Each test case must have: id, name, description, steps (array), expected_outcome, priority.
+DO NOT use tools or explore URLs."""
+        
+        user_prompt = f"""Current tests: {json.dumps(test_cases, indent=2)}
+
+User request: {message.message}"""
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        # Use model directly, not agent (to avoid tool calling)
+        response = agent_instance.model(messages)
+        
+        # Extract actual content from ChatMessage
+        if hasattr(response, 'content'):
+            response_text = response.content
+        else:
+            response_text = str(response)
+        
+        elapsed = time.time() - start
+        
+        # Extract token usage from response object
+        tokens_used = 0
+        try:
+            if hasattr(response, 'raw') and hasattr(response.raw, 'usage'):
+                usage = response.raw.usage
+                tokens_used = getattr(usage, 'total_tokens', 0)
+        except:
+            tokens_used = len(response_text.split())  # Fallback
+        
+        # Parse response for structured data
+        import re
+        response_match = re.search(r'<RESPONSE>(.*?)</RESPONSE>', response_text, re.DOTALL)
+        tests_match = re.search(r'<TEST_CASES>(.*?)</TEST_CASES>', response_text, re.DOTALL)
+        
+        data = {"response": response_text}  # Default to full text
+        
+        if response_match and tests_match:
+            try:
+                modified_tests = json.loads(tests_match.group(1).strip())
+                data = {
+                    "response": response_match.group(1).strip(),
+                    "modified_tests": modified_tests
+                }
+            except json.JSONDecodeError as e:
+                print(f"⚠️ Failed to parse test cases: {e}")
+                data = {"response": response_text}
         
         return AgentResponse(
             success=True,
-            data={"response": str(response)},
-            metrics={"phase": "chat", "response_time": 0, "tokens_used": 0}
+            data=data,
+            metrics={"phase": "chat", "response_time": elapsed, "tokens_used": tokens_used}
         )
     
     except Exception as e:
+        import traceback
+        print(f"❌ Chat error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -194,6 +281,39 @@ async def get_metrics():
         }
     
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/generate-code")
+async def generate_code(request: Dict[str, Any]) -> AgentResponse:
+    """
+    Phase 3: Generate Playwright Python code from test cases
+    
+    Expects test_cases, url, and suite_name in request body.
+    """
+    try:
+        test_cases = request.get("test_cases", [])
+        url = request.get("url", "")
+        suite_name = request.get("suite_name", "TestSuite")
+        elements = request.get("elements", [])
+        
+        if not test_cases:
+            raise HTTPException(status_code=400, detail="No test cases provided")
+        
+        code = agent_instance.generate_code(test_cases, url, suite_name, elements)
+        
+        # Get latest metrics
+        metrics = agent_instance.get_metrics()[-1] if agent_instance.get_metrics() else {}
+        
+        return AgentResponse(
+            success=True,
+            data={"code": code},
+            metrics=metrics
+        )
+    
+    except Exception as e:
+        import traceback
+        print(f"❌ Code generation error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
