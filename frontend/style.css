@@ -20,26 +20,26 @@ body {
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     max-width: 1400px;
     width: 100%;
+    height: 90vh;
     display: grid;
     grid-template-columns: 1fr 300px;
     overflow: hidden;
-    max-height: 90vh;
 }
 
 .main-panel {
     display: flex;
     flex-direction: column;
     padding: 30px;
-    overflow-y: auto;
-    max-height: 90vh;
+    height: 100%;
+    overflow: hidden;
 }
 
 .metrics-panel {
     background: #f8f9fa;
     padding: 20px;
     border-left: 1px solid #e0e0e0;
+    height: 100%;
     overflow-y: auto;
-    max-height: 90vh;
 }
 
 h1 {
@@ -230,7 +230,10 @@ button:disabled {
 
 .tab-content {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 /* Saved Explorations */
@@ -258,17 +261,22 @@ button:disabled {
     box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 .sidebar-list {
-    height: 100%;
+    flex: 1;
+    max-height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 10px;
     background: #f8f9fa;
+    min-height: 0;
 }
 
 .display-area {
-    height: 100%;
+    flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 20px;
     background: white;
+    min-height: 0;
 }
 .exploration-name-input {
     border: 1px solid #ccc;
