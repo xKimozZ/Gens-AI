@@ -289,18 +289,19 @@ async def generate_code(request: Dict[str, Any]) -> AgentResponse:
     """
     Phase 3: Generate Playwright Python code from test cases
     
-    Expects test_cases, url, and suite_name in request body.
+    Expects test_cases, url, suite_name, and optional custom_instructions in request body.
     """
     try:
         test_cases = request.get("test_cases", [])
         url = request.get("url", "")
         suite_name = request.get("suite_name", "TestSuite")
         elements = request.get("elements", [])
+        custom_instructions = request.get("custom_instructions", "")
         
         if not test_cases:
             raise HTTPException(status_code=400, detail="No test cases provided")
         
-        code = agent_instance.generate_code(test_cases, url, suite_name, elements)
+        code = agent_instance.generate_code(test_cases, url, suite_name, elements, custom_instructions)
         
         # Get latest metrics
         metrics = agent_instance.get_metrics()[-1] if agent_instance.get_metrics() else {}

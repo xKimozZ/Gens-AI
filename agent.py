@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Any
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
 
 from smolagents import (
     Tool,
@@ -20,6 +21,7 @@ from smolagents import (
 )
 from playwright.async_api import async_playwright
 
+load_dotenv()
 
 @dataclass
 class Metrics:
@@ -224,6 +226,9 @@ class TestingAgent:
             model_provider: "huggingface", "openai", or "ollama"
         """
         self.model = self._init_model(model_provider)
+        print (f"[TestingAgent] Initialized with model provider: {model_provider}")
+        model_api_key = os.getenv("OPENAI_API_KEY", "")
+        print(model_api_key)
         self.explorer_tool = PageExplorerTool()
         
         # Initialize agent with tools
@@ -241,7 +246,7 @@ class TestingAgent:
             # Works with OpenAI API or compatible endpoints
             from smolagents import OpenAIServerModel
             return OpenAIServerModel(
-                model_id=os.getenv("MODEL_NAME", "gpt-5o-mini"),
+                model_id=os.getenv("MODEL_NAME", "gpt-5-mini"),
                 api_key=os.getenv("OPENAI_API_KEY"),
                 api_base=os.getenv("API_BASE")
             )
@@ -264,7 +269,7 @@ class TestingAgent:
         
         else:
             raise ValueError(f"Unknown provider: {provider}")
-    
+
     def explore_page(self, url: str) -> ExplorationResult:
         """Phase 1: Explore and understand the page"""
         print(f"\n🔍 PHASE 1: Exploring {url}")
@@ -693,17 +698,19 @@ IMPORTANT: Reference actual elements found (e.g., 'Click Sign in button', 'Navig
         
         return test_cases
     
-    def generate_code(self, test_cases: List[Dict], url: str, suite_name: str = "TestSuite", elements: List[Dict] = None) -> str:
+    def generate_code(self, test_cases: List[Dict], url: str, suite_name: str = "TestSuite", elements: List[Dict] = None, custom_instructions: str = "") -> str:
         """Phase 3: Generate Playwright Python code with smart locator strategy"""
         print(f"\n💻 PHASE 3: Generating code for {len(test_cases)} test cases")
         print(f"📦 Exploration elements available: {len(elements) if elements else 0}")
+        if custom_instructions:
+            print(f"📝 Custom instructions: {custom_instructions[:100]}...")
         start_time = time.time()
         
         # Build page object model with smart locators from exploration elements
         page_class = self._generate_page_class(url, test_cases, elements)
         test_class = self._generate_test_class(suite_name, test_cases, url)
         
-        code = f'''"""
+        base_code = f'''"""
 Generated Test Suite: {suite_name}
 URL: {url}
 Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -719,6 +726,13 @@ from playwright.sync_api import Page, expect
 {test_class}
 '''
         
+        # If custom instructions provided, use LLM to refine the code
+        if custom_instructions:
+            print(f"🤖 Applying custom instructions via LLM...")
+            code = self._apply_custom_instructions(base_code, custom_instructions, test_cases, url)
+        else:
+            code = base_code
+        
         elapsed = time.time() - start_time
         metrics = Metrics(
             phase="code_generation",
@@ -730,6 +744,72 @@ from playwright.sync_api import Page, expect
         
         print(f"✅ Code generation complete in {elapsed:.2f}s")
         return code
+    
+    def _apply_custom_instructions(self, base_code: str, instructions: str, test_cases: List[Dict], url: str) -> str:
+        """Use LLM to apply custom instructions to the generated code"""
+        prompt = f"""You are an expert Playwright test automation engineer. I have generated the following Playwright Python test code:
+
+```python
+{base_code}
+```
+
+The user has provided these custom instructions/feedback to improve the code:
+"{instructions}"
+
+Please modify and improve the code according to these instructions. Return ONLY the complete modified Python code, nothing else. Do not include markdown code blocks or explanations - just the raw Python code.
+
+Important guidelines:
+- Keep all imports at the top
+- Maintain the pytest and Playwright patterns
+- Ensure all test methods start with test_
+- Keep the code functional and runnable
+- Apply the user's instructions thoughtfully"""
+
+        messages = [
+            {"role": "system", "content": "You are an expert test automation engineer. Return only valid Python code with no markdown formatting or explanations."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        try:
+            result = self.model(messages, stop_sequences=["```"])
+            refined_code = str(result).strip()
+            
+            print(f"[DEBUG] Raw LLM response length: {len(refined_code)}")
+            print(f"[DEBUG] First 200 chars: {refined_code[:200]}")
+            
+            # Clean up any markdown artifacts
+            if "```python" in refined_code:
+                # Extract code between ```python and ```
+                start = refined_code.find("```python") + 9
+                end = refined_code.find("```", start)
+                if end > start:
+                    refined_code = refined_code[start:end]
+            elif refined_code.startswith("```"):
+                refined_code = refined_code[3:]
+                if "```" in refined_code:
+                    refined_code = refined_code[:refined_code.find("```")]
+            
+            if refined_code.endswith("```"):
+                refined_code = refined_code[:-3]
+            refined_code = refined_code.strip()
+            
+            # More lenient validation - just check it has some Python-like content
+            has_class_or_def = "class " in refined_code or "def " in refined_code
+            has_python_keywords = "import" in refined_code or "from " in refined_code
+            is_reasonable_length = len(refined_code) > 100
+            
+            if (has_class_or_def or has_python_keywords) and is_reasonable_length:
+                print(f"✅ LLM successfully refined the code ({len(refined_code)} chars)")
+                return refined_code
+            else:
+                print(f"⚠️ LLM output didn't look like valid code (has_class_or_def={has_class_or_def}, has_python_keywords={has_python_keywords}, len={len(refined_code)}), using base code")
+                print(f"[DEBUG] Full response: {refined_code[:500]}...")
+                return base_code
+        except Exception as e:
+            print(f"⚠️ Error applying custom instructions: {e}")
+            import traceback
+            traceback.print_exc()
+            return base_code
     
     def _generate_page_class(self, url: str, test_cases: List[Dict], elements: List[Dict] = None) -> str:
         """Generate Page Object Model class with smart locators"""
