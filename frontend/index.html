@@ -689,6 +689,19 @@
       </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Core modules - load first -->
+    <script src="js/state.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/metrics.js"></script>
+    
+    <!-- UI modules - load after core -->
+    <script src="js/ui/explore.js"></script>
+    <script src="js/ui/design.js"></script>
+    <script src="js/ui/review.js"></script>
+    <script src="js/ui/codegen.js"></script>
+    
+    <!-- Main app - load last -->
+    <script src="js/main.js"></script>
   </body>
 </html>
