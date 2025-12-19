@@ -2,7 +2,7 @@
  * API Client for FastAPI Backend
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface ExplorationData {
   url: string;
@@ -52,10 +52,12 @@ export interface Metrics {
 /**
  * Explore a URL
  */
-export async function apiExploreUrl(url: string): Promise<ApiResponse<ExplorationData>> {
+export async function apiExploreUrl(
+  url: string
+): Promise<ApiResponse<ExplorationData>> {
   const response = await fetch(`${API_BASE_URL}/api/explore`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
   });
   return response.json();
@@ -69,11 +71,11 @@ export async function apiDesignTests(
   testCount: number
 ): Promise<ApiResponse<{ test_cases: TestCase[] }>> {
   const response = await fetch(`${API_BASE_URL}/api/design-tests`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       ...explorationData,
-      desired_test_count: testCount 
+      desired_test_count: testCount,
     }),
   });
   return response.json();
@@ -88,16 +90,16 @@ export async function apiSendChatMessage(
   explorationData?: ExplorationData
 ): Promise<ApiResponse<{ test_cases: TestCase[]; response: string }>> {
   const response = await fetch(`${API_BASE_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       message: message,
       context: {
         test_cases: testCases,
-        url: explorationData?.url || '',
+        url: explorationData?.url || "",
         elements: explorationData?.elements || [],
-        structure: explorationData?.structure || ''
-      }
+        structure: explorationData?.structure || "",
+      },
     }),
   });
   return response.json();
@@ -111,19 +113,60 @@ export async function apiGenerateCode(
   url: string,
   suiteName: string,
   elements?: any[],
-  customInstructions?: string
-): Promise<ApiResponse<{ code: string }>> {
+  customInstructions?: string,
+  runTests?: boolean
+): Promise<ApiResponse<{ code: string; execution_log?: any }>> {
   const response = await fetch(`${API_BASE_URL}/api/generate-code`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       test_cases: testCases,
       url: url,
       suite_name: suiteName,
       elements: elements || [],
-      custom_instructions: customInstructions || ''
+      custom_instructions: customInstructions || "",
+      run_tests: runTests || false,
     }),
   });
+  return response.json();
+}
+
+/**
+ * Review/critique test execution results
+ */
+export async function apiReviewTests(
+  code: string,
+  executionLog: any,
+  critique: string,
+  action: "analyze" | "refactor" | "explain" = "analyze"
+): Promise<
+  ApiResponse<{ action: string; response: string; refactored_code?: string }>
+> {
+  const response = await fetch(`${API_BASE_URL}/api/review-tests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      code,
+      execution_log: executionLog,
+      critique,
+      action,
+    }),
+  });
+  return response.json();
+}
+
+/**
+ * Get latest evidence files
+ */
+export async function apiGetLatestEvidence(): Promise<
+  ApiResponse<{
+    run_id: string;
+    screenshots: { name: string; url: string }[];
+    videos: { name: string; url: string }[];
+    action_logs: { name: string; url: string }[];
+  }>
+> {
+  const response = await fetch(`${API_BASE_URL}/api/evidence/latest`);
   return response.json();
 }
 
@@ -141,7 +184,7 @@ export async function apiGetMetrics(): Promise<Metrics> {
  */
 export async function apiResetAgent(): Promise<ApiResponse> {
   const response = await fetch(`${API_BASE_URL}/api/reset`, {
-    method: 'POST',
+    method: "POST",
   });
   return response.json();
 }

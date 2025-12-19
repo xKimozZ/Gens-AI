@@ -68,6 +68,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files for serving test evidence (screenshots, videos)
+TESTS_DIR = os.path.join(os.path.dirname(__file__), "tests")
+EVIDENCE_DIR = os.path.join(TESTS_DIR, "evidence")
+os.makedirs(EVIDENCE_DIR, exist_ok=True)
+app.mount("/evidence", StaticFiles(directory=EVIDENCE_DIR), name="evidence")
+
+
+@app.get("/api/evidence/{run_id}/{file_type}/{filename}")
+async def get_evidence_file(run_id: str, file_type: str, filename: str):
+    """Serve evidence files (screenshots, videos, logs) for test runs."""
+    file_path = os.path.join(EVIDENCE_DIR, run_id, file_type, filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail="Evidence file not found")
+
+
+@app.get("/api/evidence/latest")
+async def get_latest_evidence():
+    """Get list of evidence from the most recent test run."""
+    import glob
+    import json
+    
+    run_dirs = sorted(glob.glob(os.path.join(EVIDENCE_DIR, "run_*")), reverse=True)
+    if not run_dirs:
+        return {"success": True, "data": {"runs": []}}
+    
+    latest_run = run_dirs[0]
+    run_id = os.path.basename(latest_run)
+    
+    evidence = {
+        "run_id": run_id,
+        "screenshots": [],
+        "videos": [],
+        "action_logs": []
+    }
+    
+    # Collect screenshots
+    screenshots_dir = os.path.join(latest_run, "screenshots")
+    if os.path.exists(screenshots_dir):
+        for f in glob.glob(os.path.join(screenshots_dir, "*.png")):
+            evidence["screenshots"].append({
+                "name": os.path.basename(f),
+                "url": f"/api/evidence/{run_id}/screenshots/{os.path.basename(f)}"
+            })
+    
+    # Collect videos
+    videos_dir = os.path.join(latest_run, "videos")
+    if os.path.exists(videos_dir):
+        for f in glob.glob(os.path.join(videos_dir, "*.webm")):
+            evidence["videos"].append({
+                "name": os.path.basename(f),
+                "url": f"/api/evidence/{run_id}/videos/{os.path.basename(f)}"
+            })
+    
+    # Collect action logs
+    logs_dir = os.path.join(latest_run, "logs")
+    if os.path.exists(logs_dir):
+        for f in glob.glob(os.path.join(logs_dir, "*.json")):
+            evidence["action_logs"].append({
+                "name": os.path.basename(f),
+                "url": f"/api/evidence/{run_id}/logs/{os.path.basename(f)}"
+            })
+    
+    return {"success": True, "data": evidence}
+
 
 @app.post("/api/explore")
 async def explore_page(request: ExploreRequest) -> AgentResponse:
@@ -295,6 +360,10 @@ async def generate_code(request: Dict[str, Any]) -> AgentResponse:
         run_tests = request.get("run_tests", False)  # Enable test execution
         headless = request.get("headless", True)  # Headless browser mode
         
+        # Debug logging
+        print(f"[DEBUG] /api/generate-code received run_tests={run_tests} (type: {type(run_tests).__name__})")
+        print(f"[DEBUG] Full request keys: {list(request.keys())}")
+        
         if not test_cases:
             raise HTTPException(status_code=400, detail="No test cases provided")
         
@@ -321,6 +390,11 @@ async def generate_code(request: Dict[str, Any]) -> AgentResponse:
         
         # Add execution log if available
         if execution_log:
+            # Extract run_id from evidence_dir path
+            evidence_run_id = None
+            if execution_log.evidence_dir:
+                evidence_run_id = os.path.basename(execution_log.evidence_dir)
+            
             response_data["execution_log"] = {
                 "total_tests": execution_log.total_tests,
                 "passed": execution_log.passed,
@@ -329,6 +403,7 @@ async def generate_code(request: Dict[str, Any]) -> AgentResponse:
                 "duration": execution_log.duration,
                 "all_passed": execution_log.all_passed,
                 "success_rate": execution_log.success_rate,
+                "evidence_run_id": evidence_run_id,
                 "test_results": [
                     {
                         "test_name": r.test_name,
@@ -336,10 +411,21 @@ async def generate_code(request: Dict[str, Any]) -> AgentResponse:
                         "duration": r.duration,
                         "error_message": r.error_message,
                         "error_type": r.error_type,
-                        "line_number": r.line_number
+                        "line_number": r.line_number,
+                        "screenshot_url": f"/api/evidence/{evidence_run_id}/screenshots/{os.path.basename(r.screenshot_path)}" if r.screenshot_path and evidence_run_id else None,
+                        "video_url": f"/api/evidence/{evidence_run_id}/videos/{os.path.basename(r.video_path)}" if r.video_path and evidence_run_id else None,
+                        "action_log_url": f"/api/evidence/{evidence_run_id}/logs/{os.path.basename(r.action_log_path)}" if r.action_log_path and evidence_run_id else None,
                     }
                     for r in execution_log.test_results
                 ],
+                "screenshots": [
+                    f"/api/evidence/{evidence_run_id}/screenshots/{os.path.basename(s)}" 
+                    for s in execution_log.screenshots
+                ] if evidence_run_id else [],
+                "videos": [
+                    f"/api/evidence/{evidence_run_id}/videos/{os.path.basename(v)}" 
+                    for v in execution_log.videos
+                ] if evidence_run_id else [],
                 "summary": str(execution_log)
             }
         
@@ -352,6 +438,133 @@ async def generate_code(request: Dict[str, Any]) -> AgentResponse:
     except Exception as e:
         import traceback
         print(f"❌ Code generation error: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/review-tests")
+async def review_tests(request: Dict[str, Any]) -> AgentResponse:
+    """
+    Phase 4: Review test execution and refactor based on critique.
+    
+    Expects:
+        - code: Current test code
+        - execution_log: Results from test run
+        - critique: User's feedback/critique
+        - action: 'analyze', 'refactor', or 'explain'
+    """
+    try:
+        code = request.get("code", "")
+        execution_log = request.get("execution_log", {})
+        critique = request.get("critique", "")
+        action = request.get("action", "analyze")
+        
+        if not code:
+            raise HTTPException(status_code=400, detail="No code provided")
+        
+        # Build context for the LLM
+        test_results_summary = ""
+        if execution_log:
+            test_results_summary = f"""
+Test Execution Summary:
+- Total: {execution_log.get('total_tests', 0)} tests
+- Passed: {execution_log.get('passed', 0)}
+- Failed: {execution_log.get('failed', 0)}
+- Errors: {execution_log.get('errors', 0)}
+- Success Rate: {execution_log.get('success_rate', 0):.1f}%
+
+Test Results:
+"""
+            for r in execution_log.get('test_results', []):
+                status = "✅ PASSED" if r.get('passed') else "❌ FAILED"
+                test_results_summary += f"  {status}: {r.get('test_name')}\n"
+                if not r.get('passed') and r.get('error_message'):
+                    test_results_summary += f"    Error: {r.get('error_type')}: {r.get('error_message')[:200]}\n"
+        
+        # Build prompt based on action
+        if action == "analyze":
+            prompt = f"""Analyze the following test execution results and provide insights:
+
+{test_results_summary}
+
+User Critique/Question:
+{critique}
+
+Provide a detailed analysis including:
+1. What tests are failing and why
+2. Potential root causes
+3. Suggestions for improvement
+4. Any patterns in the failures"""
+
+        elif action == "refactor":
+            prompt = f"""Refactor the following test code based on the execution results and user feedback:
+
+Current Code:
+```python
+{code[:5000]}
+```
+
+{test_results_summary}
+
+User Feedback:
+{critique}
+
+Requirements:
+1. Fix the failing tests based on the error messages
+2. Address the user's feedback
+3. Improve locator reliability if needed
+4. Add better error handling
+5. Return ONLY the complete refactored Python code, no explanations"""
+
+        elif action == "explain":
+            prompt = f"""Explain the test execution results in simple terms:
+
+{test_results_summary}
+
+User Question:
+{critique}
+
+Provide a clear, user-friendly explanation of:
+1. What happened during the test run
+2. Why certain tests might have failed
+3. What the error messages mean
+4. Recommended next steps"""
+        
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
+        
+        # Call LLM for analysis/refactoring
+        from core.llm_provider import init_model
+        model = init_model("openai")
+        
+        messages = [
+            {"role": "system", "content": "You are an expert test automation engineer helping users understand and improve their Playwright tests."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        result = model(messages)
+        
+        # Extract response content
+        response_text = ""
+        if hasattr(result, 'content'):
+            response_text = result.content
+        elif isinstance(result, dict):
+            response_text = result.get('content') or result.get('text', '')
+        else:
+            response_text = str(result)
+        
+        return AgentResponse(
+            success=True,
+            data={
+                "action": action,
+                "response": response_text,
+                "refactored_code": response_text if action == "refactor" else None
+            },
+            metrics={}
+        )
+    
+    except Exception as e:
+        import traceback
+        print(f"❌ Review error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -1,3 +1,6 @@
 .env
 __pycache__/
 tests/
+frontend-next/node_modules/
+frontend-next/.next/
+frontend-next/out/
