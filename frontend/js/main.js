@@ -17,7 +17,7 @@ function switchTab(tabName) {
   document.querySelectorAll(".tab-content").forEach((content) => {
     content.style.display = "none";
   });
-  document.getElementById(`tab-${tabName}`).style.display = "block";
+  document.getElementById(`tab-${tabName}`).style.display = "flex";
 
   // Render content for specific tabs
   if (tabName === "testsuites") {
