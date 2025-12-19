@@ -6,7 +6,7 @@ from openai import OpenAI
 load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-client = OpenAI(api_key="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", 
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), 
                 base_url="https://api.githubcopilot.com"
                 )
 
