@@ -9,17 +9,12 @@
   <body>
     <div class="container">
       <div class="main-panel">
-        <h1>🤖 Web Testing Agent</h1>
-        <p class="subtitle">AI-powered test exploration and design</p>
-
-        <div class="input-section">
-          <input
-            type="text"
-            id="urlInput"
-            placeholder="Enter URL to explore (e.g., https://demo.playwright.dev/todomvc)"
-            value="https://www.google.com"
-          />
-          <button onclick="exploreUrl()" id="exploreBtn">🔍 Explore</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div>
+            <h1>🤖 Web Testing Agent</h1>
+            <p class="subtitle">AI-powered test exploration and design</p>
+          </div>
+          <button onclick="resetAgent()" class="btn-danger" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px;">🔄 Reset Agent</button>
         </div>
 
         <!-- Tabs Navigation -->
@@ -48,12 +43,24 @@
 
         <!-- Tab Content -->
         <div class="tab-content" id="tab-explorations">
+          <!-- Exploration Input Section -->
+          <div class="input-section" style="margin-bottom: 15px; flex-shrink: 0;">
+            <input
+              type="text"
+              id="urlInput"
+              placeholder="Enter URL to explore (e.g., https://demo.playwright.dev/todomvc)"
+              value="https://www.google.com"
+              onkeypress="if(event.key === 'Enter') exploreUrl()"
+            />
+            <button onclick="exploreUrl()" id="exploreBtn">🔍 Explore</button>
+          </div>
+
           <div
             style="
               display: grid;
               grid-template-columns: 250px 1fr;
               gap: 15px;
-              height: 100%;
+              flex: 1;
               min-height: 0;
             "
           >
@@ -64,7 +71,6 @@
                 padding-right: 15px;
                 display: flex;
                 flex-direction: column;
-                height: 100%;
                 min-height: 0;
               "
             >
@@ -107,7 +113,6 @@
               style="
                 overflow-y: auto;
                 padding: 0 10px;
-                height: 100%;
                 min-height: 0;
               "
             >
@@ -129,12 +134,31 @@
         </div>
 
         <div class="tab-content" id="tab-testsuites" style="display: none">
+          <!-- Test Design Controls -->
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+            <label style="font-size: 13px; color: #667eea; font-weight: 600;">Test Count:</label>
+            <select
+              id="testCountSelect"
+              style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e0e0e0; font-size: 13px;"
+            >
+              <option value="5">5 tests</option>
+              <option value="8">8 tests</option>
+              <option value="10">10 tests</option>
+              <option value="12" selected>12 tests</option>
+              <option value="15">15 tests</option>
+              <option value="20">20 tests</option>
+            </select>
+            <button onclick="designTests()" id="designBtn" disabled style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 600;">📋 Design Tests</button>
+            <div style="flex: 1;"></div>
+            <span style="font-size: 12px; color: #6c757d;">💡 Select an exploration from the Explorations tab first</span>
+          </div>
+
           <div
             style="
               display: grid;
               grid-template-columns: 250px 1fr;
               gap: 15px;
-              height: 100%;
+              flex: 1;
               min-height: 0;
             "
           >
@@ -145,7 +169,6 @@
                 padding-right: 15px;
                 display: flex;
                 flex-direction: column;
-                height: 100%;
                 min-height: 0;
               "
             >
@@ -188,7 +211,6 @@
               style="
                 overflow-y: auto;
                 padding: 0 10px;
-                height: 100%;
                 min-height: 0;
               "
             >
@@ -558,32 +580,6 @@
           </div>
         </div>
 
-        <div class="button-group">
-          <label style="font-size: 13px; color: #667eea; margin-right: 8px"
-            >Test Count:</label
-          >
-          <select
-            id="testCountSelect"
-            style="
-              padding: 8px;
-              border-radius: 6px;
-              border: 1px solid #e0e0e0;
-              margin-right: 12px;
-              font-size: 13px;
-            "
-          >
-            <option value="5">5 tests</option>
-            <option value="8">8 tests</option>
-            <option value="10">10 tests</option>
-            <option value="12" selected>12 tests</option>
-            <option value="15">15 tests</option>
-            <option value="20">20 tests</option>
-          </select>
-          <button onclick="designTests()" id="designBtn" disabled>
-            📋 Design Tests
-          </button>
-          <button onclick="resetAgent()" class="btn-secondary">🔄 Reset</button>
-        </div>
       </div>
 
       <div class="metrics-panel">

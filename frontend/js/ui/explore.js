@@ -193,17 +193,21 @@ function deleteExploration(id) {
  * Reset agent state
  */
 async function resetAgent() {
-  if (
-    confirm(
-      "Reset agent state? This will clear backend state but keep local storage."
-    )
-  ) {
-    try {
-      await apiResetAgent();
-      updateMetrics();
-      alert("Agent reset complete");
-    } catch (error) {
-      alert("Reset failed: " + error.message);
-    }
+  const confirmed = confirm(
+    "⚠️ WARNING: This will reset the agent state on the backend.\n\n" +
+    "Your locally saved explorations, test suites, and chat history will NOT be affected.\n\n" +
+    "Do you want to continue?"
+  );
+  
+  if (!confirmed) {
+    return;
+  }
+  
+  try {
+    await apiResetAgent();
+    updateMetrics();
+    alert("✅ Agent reset complete");
+  } catch (error) {
+    alert("❌ Reset failed: " + error.message);
   }
 }
