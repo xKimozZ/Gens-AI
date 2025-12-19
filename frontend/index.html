@@ -523,6 +523,81 @@
                   "
                 ></textarea>
               </div>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  margin-top: 10px;
+                "
+              >
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    cursor: pointer;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="runTestsCheckbox"
+                    style="width: 16px; height: 16px; cursor: pointer"
+                  />
+                  <span
+                    style="font-size: 13px; color: #667eea; font-weight: 600"
+                  >
+                    🧪 Run Tests for Verification
+                  </span>
+                </label>
+                <span style="font-size: 11px; color: #888">
+                  (Actually executes tests and shows pass/fail results)
+                </span>
+                <span
+                  id="runTestsStatus"
+                  style="font-size: 12px; color: #bbb; margin-left: 12px"
+                >
+                  Test execution: Disabled
+                </span>
+              </div>
+            </div>
+
+            <!-- Test Execution Results (shown when tests are run) -->
+            <div
+              id="executionLogContainer"
+              style="
+                display: none;
+                background: #1a1a2e;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 10px;
+                border: 1px solid #333;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 10px;
+                "
+              >
+                <h4 style="margin: 0; color: #667eea; font-size: 14px">
+                  🧪 Test Execution Results
+                </h4>
+                <span
+                  id="executionSummary"
+                  style="font-size: 12px; color: #4ade80"
+                ></span>
+              </div>
+              <div
+                id="executionDetails"
+                style="
+                  font-family: 'Consolas', monospace;
+                  font-size: 12px;
+                  color: #e0e0e0;
+                "
+              ></div>
             </div>
 
             <div

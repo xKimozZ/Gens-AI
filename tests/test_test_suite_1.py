@@ -1,294 +1,288 @@
-"""
-Generated Test Suite: Test Suite 3
-URL: https://automationexercise.com/test_cases
-Generated: 2025-12-19 14:43:37
-Test Framework: Playwright + pytest
-"""
-
-import re
-import pytest
 from playwright.sync_api import Page, expect
+import pytest
+import re
 
-class WebPage:
-    """Page Object Model for https://automationexercise.com/test_cases"""
-    
+class TestCasesPage:
+    """
+    Page Object Model for the /test_cases page of automationexercise.com
+    Encapsulates locators and common actions for reusability across tests.
+    """
+
+    URL = "https://automationexercise.com/test_cases"
+
     def __init__(self, page: Page):
         self.page = page
-        self.url = "https://automationexercise.com/test_cases"
-    
-    def navigate(self):
-        """Navigate to the page"""
-        self.page.goto(self.url)
-    
-    def get_subscribe(self):
-        """Smart locator for subscribe"""
-        return self.page.locator("#subscribe")
-    def get_susbscribe_email(self):
-        """Smart locator for susbscribe_email"""
-        return self.page.locator("#susbscribe_email")
-    def get_API_Testing(self):
-        """Smart locator for API_Testing"""
-        return self.page.get_by_text("API Testing")
-    def get_Cart(self):
-        """Smart locator for Cart"""
-        return self.page.get_by_text("Cart")
-    def get_Contact_us(self):
-        """Smart locator for Contact_us"""
-        return self.page.get_by_text("Contact us")
-    def get_Home(self):
-        """Smart locator for Home"""
-        return self.page.get_by_text("Home")
-    def get_Products(self):
-        """Smart locator for Products"""
-        return self.page.get_by_text(" Products")
-    def get_Signup_Login(self):
-        """Smart locator for Signup_Login"""
-        return self.page.get_by_text("Signup / Login")
-    def get_Test_Case_1_Register_User(self):
-        """Smart locator for Test_Case_1_Register_User"""
-        return self.page.get_by_text("Test Case 1: Register User")
-    def get_Test_Case_4_Logout_User(self):
-        """Smart locator for Test_Case_4_Logout_User"""
-        return self.page.get_by_text("Test Case 4: Logout User")
-    def get_Test_Case_5_Register_User_with(self):
-        """Smart locator for Test_Case_5_Register_User_with"""
-        return self.page.get_by_text("Test Case 5: Register User with existing email")
-    def get_Test_Case_6_Contact_Us_Form(self):
-        """Smart locator for Test_Case_6_Contact_Us_Form"""
-        return self.page.get_by_text("Test Case 6: Contact Us Form")
-    def get_Test_Cases(self):
-        """Smart locator for Test_Cases"""
-        return self.page.get_by_text("Test Cases")
-    def get_Video_Tutorials(self):
-        """Smart locator for Video_Tutorials"""
-        return self.page.get_by_text("Video Tutorials")
-    def get_http_automationexercise_com(self):
-        """Smart locator for http_automationexercise_com"""
-        return self.page.get_by_text("'http://automationexercise.com'")
+        # Recommended locators from provided list and sensible additions
+        self.home_link = page.get_by_role("link", name="Home")
+        self.products_link = page.get_by_role("link", name=" Products")
+        self.cart_link = page.get_by_role("link", name="Cart")
+        self.signup_login_link = page.get_by_role("link", name="Signup / Login")
+        self.test_cases_link = page.get_by_role("link", name="Test Cases")
+        self.api_testing_link = page.get_by_role("link", name="API Testing")
+        self.video_tutorials_link = page.get_by_role("link", name="Video Tutorials")
+        self.test_case_1_link = page.get_by_role("link", name="Test Case 1: Register User")
+        self.test_case_2_link = page.get_by_role("link", name="Test Case 2: Login User with correct email and password")
+        self.test_case_3_link = page.get_by_role("link", name="Test Case 3: Login User with incorrect email and password")
+        # Subscribe button id provided as recommended locator
+        self.subscribe_button = page.locator("#subscribe")
+        # Email input is not listed in recommendations but exists on the page with id 'susbscribe_email' on this site
+        # Using id locator as it has higher priority and is stable.
+        self.subscribe_email_input = page.locator("#susbscribe_email")
+        # Header and footer semantic roles
+        self.header = page.get_by_role("banner")
+        self.footer = page.get_by_role("contentinfo")
 
-class TestTest_Suite_3:
-    """Generated test suite: Test Suite 3"""
-    
-    @pytest.fixture(autouse=True)
-    def setup(self, page: Page):
-        """Setup before each test"""
-        page.set_viewport_size({"width": 1280, "height": 720})
-        yield
-        # Teardown after each test
-    
-    def test_verify_header_footer_and_key_links_are_present(self, page: Page):
+    def goto(self):
+        """Navigate to the test cases page and ensure it loaded."""
+        self.page.goto(self.URL)
+        # Wait for a key element on the page (the Test Cases link) to be visible
+        expect(self.test_cases_link).to_be_visible(timeout=10000)
+
+    def click_home(self):
+        """Click the Home link and wait for navigation."""
+        self.home_link.click()
+        expect(self.page).to_have_url(re.compile(r"^https?://(www\.)?automationexercise\.com/?$"), timeout=10000)
+
+    def click_products(self):
+        """Click the Products link and wait for products page to load."""
+        self.products_link.click()
+        # Products page should contain 'Products' heading or have /products in URL
+        expect(self.page).to_have_url(re.compile(r".*/products.*", re.IGNORECASE), timeout=10000)
+        # Also ensure product listing content is visible (broad check for 'Products' text)
+        expect(self.page.locator("text=Products")).to_be_visible(timeout=10000)
+
+    def subscribe(self, email: str):
+        """Fill the subscribe email input and click subscribe button."""
+        # Ensure email input is visible and fill
+        expect(self.subscribe_email_input).to_be_visible(timeout=5000)
+        self.subscribe_email_input.fill(email)
+        # Click subscribe and allow the page/app to respond
+        self.subscribe_button.click()
+
+    def get_subscribe_validation_message(self) -> str:
         """
-        Validates presence of page header and footer and visibility of key links like \'Home\', \'\ue8f8 Products\', \'Cart\', \'Signup / Login\', \'Test Cases\', \'API Testing\', \'Video Tutorials\', \'Contact us\', and \'
-        
-        Expected: Test should complete successfully
-        Priority: Medium
+        Query the browser validation message for the subscribe email input.
+        Returns the native validation message (may be empty string if none).
         """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. Navigate to the page
-        # Navigation handled by web_page.navigate()
-        # 2. Validates presence of page header and footer and visibility of key links like \'Home\', \'\ue8f8 Products\', \'Cart\', \'Signup / Login\', \'Test Cases\', \'API Testing\', \'Video Tutorials\', \'Contact us\', and \'
-        # Implement: Validates presence of page header and footer and v
-    def test_register_user(self, page: Page):
-        """
-        Test case generated from page analysis
-        
-        Expected: Test should complete successfully
-        Priority: Medium
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. Open https://automationexercise.com/test_cases
-        # Implement: Open https://automationexercise.com/test_cases
-        # 2. Inspect the page for header and footer elements
-        # Implement: Inspect the page for header and footer elements
-        # 3. Verify the links with texts \'Home\', \'\ue8f8 Products\', \'Cart\', \'Signup / Login\', \'Test Cases\', \'API Testing\', \'Video Tutorials\', \'Contact us\', and \
-        # Add verification assertion
-    def test_navigate_using_home_link(self, page: Page):
-        """
-        Validates that clicking the \'Home\' link navigates away from the Test Cases page to the site home
-        
-        Expected: Browser navigates away from /test_cases (URL changes) and landing page loads without error (HTTP 200)
-        Priority: High
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link with text \'Home\
-        # Click action - specify locator manually
-        # 2. Wait for navigation to complete
-        page.wait_for_load_state('networkidle')
-        # 3. Verify the browser URL is different from \'/test_cases\' and the page loads successfully
-        expect(page).to_have_url(re.compile(r'.*'))
-    def test_navigate_using_ue8f8_products_link(self, page: Page):
-        """
-        Validates that clicking the \'\ue8f8 Products\' link navigates to the products page
-        
-        Expected: Products page loads successfully and content related to products is visible
-        Priority: High
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link with text \'\ue8f8 Products\
-        # Click action - specify locator manually
-        # 2. Wait for navigation to complete
-        page.wait_for_load_state('networkidle')
-        # 3. Verify the URL or page content indicates the Products page has loaded (page content updates to product listing)
-        expect(page).to_have_url(re.compile(r'.*'))
-    def test_navigate_using_cart_link(self, page: Page):
-        """
-        Validates that clicking the \'Cart\' link navigates to the cart page
-        
-        Expected: Cart page loads successfully and cart-related content is visible
-        Priority: High
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link with text \'Cart\
-        # Click action - specify locator manually
-        # 2. Wait for navigation to complete
-        page.wait_for_load_state('networkidle')
-        # 3. Verify the cart page content is displayed (cart header or empty cart message visible)
-        # Verify element visibility (e.g., expect(web_page.get_element()).to_be_visible())
-    def test_navigate_using_signup_login_link(self, page: Page):
-        """
-        Validates that clicking the \'Signup / Login\' link opens the sign up / login page
-        
-        Expected: Sign up / Login page loads and shows expected authentication fields
-        Priority: High
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link with text \'Signup / Login\
-        # Click action - specify locator manually
-        # 2. Wait for navigation to complete
-        page.wait_for_load_state('networkidle')
-        # 3. Verify the Sign up / Login form or relevant headings are present
-        # Add verification assertion
-    def test_verify_test_cases_link_behavior_on_test_cases_page(self, page: Page):
-        """
-        Validates behavior of the \'Test Cases\' link when already on the Test Cases page (link text = \'Test Cases\')
-        
-        Expected: navigation) and page content for Test Cases remains visible Expected: Clicking \'Test Cases\' does not break navigation; user remains on Test Cases page and content is unchanged
-        Priority: Medium
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. Ensure you are on https://automationexercise.com/test_cases
-        # Implement: Ensure you are on https://automationexercise.com/t
-        # 2. Click the link with text \'Test Cases\
-        # Click action - specify locator manually
-        # 3. Verify the URL remains /test_cases (or no unexpected navigation) and page content for Test Cases remains visible
-        expect(page).to_have_url(re.compile(r'.*'))
-    def test_navigate_using_api_testing_link(self, page: Page):
-        """
-        Validates that clicking the \'API Testing\' link navigates to the API Testing page
-        
-        Expected: API Testing page loads successfully and API-related content is visible
-        Priority: Medium
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link with text \'API Testing\
-        # Click action - specify locator manually
-        # 2. Wait for navigation to complete
-        page.wait_for_load_state('networkidle')
-        # 3. Verify the page content or URL indicates API Testing information is displayed
-        expect(page).to_have_url(re.compile(r'.*'))
-    def test_navigate_using_video_tutorials_link(self, page: Page):
-        """
-        Validates that clicking the \'Video Tutorials\' link navigates to the video tutorials page
-        
-        Expected: Video Tutorials page loads and tutorial content is visible
-        Priority: Medium
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link with text \'Video Tutorials\
-        # Click action - specify locator manually
-        # 2. Wait for navigation to complete
-        page.wait_for_load_state('networkidle')
-        # 3. Verify video tutorials content or a video list is present on the resulting page
-        # Add verification assertion
-    def test_navigate_using_contact_us_link(self, page: Page):
-        """
-        Validates that clicking the \'Contact us\' link navigates to the contact form or contact page
-        
-        Expected: Contact page loads successfully and contact form or contact details are visible
-        Priority: Medium
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link with text \'Contact us\
-        # Click action - specify locator manually
-        # 2. Wait for navigation to complete
-        page.wait_for_load_state('networkidle')
-        # 3. Verify a contact form or contact information is displayed
-        # Verify element visibility (e.g., expect(web_page.get_element()).to_be_visible())
-    def test_register_user_details(self, page: Page):
-        """
-        Validates that clicking \'
-        
-        Expected: Test should complete successfully
-        Priority: Medium
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. Navigate to the page
-        # Navigation handled by web_page.navigate()
-        # 2. Validates that clicking \'
-        # Click action - specify locator manually
-    def test_register_user_link_opens_the_specific_test_case_detail_or_section(self, page: Page):
-        """
-        Test case generated from page analysis
-        
-        Expected: Test should complete successfully
-        Priority: Medium
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link with text \
-        # Click action - specify locator manually
-    def test_click_link_with_no_text_id_logo_unknown_link_navigates_to_home(self, page: Page):
-        """
-        Validates that the link with no text/id (likely logo) is clickable and navigates to the site root/home
-        
-        Expected: Clicking the no-text link navigates to the site home (URL differs from /test_cases) and home content loads
-        Priority: Medium
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases click the link that has no text/id (the link listed without text/id)
-        # Click action - specify locator manually
-        # 2. Wait for navigation to complete
-        page.wait_for_load_state('networkidle')
-        # 3. Verify the URL changes away from /test_cases and the Home page or site root content is displayed
-        expect(page).to_have_url(re.compile(r'.*'))
-    def test_newsletter_subscribe_positive_and_negative_validation(self, page: Page):
-        """
-        Validates the newsletter input with id="susbscribe_email" and the subscribe button id="subscribe" for correct attributes, successful submission with a valid email, and proper validation for invalid/empty input
-        
-        Expected: Input id="susbscribe_email" is type="email"; button id="subscribe" is type="submit". Submitting a valid email shows a subscription success/confirmation. Submitting an invalid or empty email triggers validation and prevents successful submission (error or validation prompt)
-        Priority: High
-        """
-        web_page = WebPage(page)
-        web_page.navigate()
-        
-        # 1. On https://automationexercise.com/test_cases verify the input with id="susbscribe_email" has type="email" and the button with id="subscribe" has type="submit
-        web_page.get_susbscribe_email().fill('susbscribe_email')
-        # 2. Enter a valid email (e.g., test@example.com) into the input with id="susbscribe_email" and click the button with id="subscribe
-        web_page.get_susbscribe_email().click()
-        # 3. Verify a success/confirmation message appears or the form submission completes without client-side validation errors; then enter an invalid email (e.g., \'invalid-email\') or leave the input empty and click id="subscribe" and verify client-side validation prevents submission or an error message is shown
-        web_page.get_subscribe().click()
+        # Use eval_on_selector to retrieve the element's validationMessage reliably
+        return self.page.eval_on_selector("#susbscribe_email", "el => el.validationMessage") or ""
+
+    def header_contains_nav_or_branding(self) -> bool:
+        """Check header contains expected navigation/branding elements like the Home link."""
+        try:
+            # Check Home link exists within header
+            header_home = self.header.get_by_role("link", name="Home")
+            expect(header_home).to_be_visible(timeout=5000)
+            return True
+        except Exception:
+            return False
+
+    def footer_contains_branding(self) -> bool:
+        """Check footer contains expected branding or navigation elements."""
+        # Broad check: footer should contain the site domain or 'Copyright' or 'Automation Exercise'
+        footer_text = self.footer.locator("xpath=./*")
+        # We'll assert footer has some visible textual content containing 'automation' or 'copyright'
+        try:
+            expect(self.page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'automation')]")).to_be_visible(timeout=5000)
+            return True
+        except Exception:
+            try:
+                expect(self.page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'copyright')]")).to_be_visible(timeout=5000)
+                return True
+            except Exception:
+                return False
+
+@pytest.fixture(scope="function")
+def test_cases_page(page: Page) -> TestCasesPage:
+    """Pytest fixture to provide a prepared TestCasesPage instance."""
+    p = TestCasesPage(page)
+    p.goto()
+    return p
+
+def test_header_and_footer_presence(test_cases_page: TestCasesPage):
+    """
+    Test 1: Verify header and footer presence
+    Validates that header (role=banner) and footer (role=contentinfo) are visible and contain expected elements.
+    """
+    page = test_cases_page.page
+    # Header visible
+    expect(test_cases_page.header).to_be_visible(timeout=5000)
+    assert test_cases_page.header_contains_nav_or_branding(), "Header does not contain expected navigation/branding elements."
+
+    # Footer visible
+    expect(test_cases_page.footer).to_be_visible(timeout=5000)
+    assert test_cases_page.footer_contains_branding(), "Footer does not contain expected branding/navigation elements."
+
+def test_navigate_to_home_via_home_link(test_cases_page: TestCasesPage):
+    """
+    Test 2: Navigate to Home via Home link
+    Validates clicking 'Home' navigates to the site homepage.
+    """
+    page = test_cases_page.page
+    # Click Home and verify navigation completed in POM
+    test_cases_page.click_home()
+    # Ensure homepage content visible - site typically shows categories or slider with text like 'Full-Fledged practice website'
+    expect(page.locator("text=Full-Fledged")).to_be_visible(timeout=10000)
+
+def test_navigate_to_products(test_cases_page: TestCasesPage):
+    """
+    Test 3: Navigate to Products via ' Products' link
+    Validates clicking the Products link loads the products page.
+    """
+    page = test_cases_page.page
+    test_cases_page.products_link.click()
+    expect(page).to_have_url(re.compile(r".*/products.*", re.IGNORECASE), timeout=10000)
+    # Ensure product listing or filter is visible
+    expect(page.locator("text=Category")).to_be_visible(timeout=10000)
+
+def test_subscribe_with_valid_email(test_cases_page: TestCasesPage):
+    """
+    Test 4: Subscribe with valid email
+    Validates subscribing with a valid email shows confirmation.
+    """
+    page = test_cases_page.page
+    test_cases_page.subscribe("user@example.com")
+    # Look for any visible element that indicates success - check for 'subscribed' keyword case-insensitive anywhere on page
+    success_locator = page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'subscribed')]")
+    expect(success_locator).to_be_visible(timeout=10000)
+
+def test_subscribe_with_invalid_email_format(test_cases_page: TestCasesPage):
+    """
+    Test 5: Subscribe with invalid email format
+    Validates client-side/server-side validation for invalid email formats.
+    """
+    page = test_cases_page.page
+    # Ensure field is empty then type invalid email
+    test_cases_page.subscribe_email_input.fill("")
+    test_cases_page.subscribe("invalidemail")
+    # For HTML5 email inputs, the browser's validationMessage should be non-empty when invalid
+    validation_message = test_cases_page.get_subscribe_validation_message()
+    # If validation_message is empty, attempt to detect inline error messages referencing 'valid' or 'email'
+    if validation_message:
+        assert len(validation_message) > 0, "Expected browser validation message for invalid email, got empty."
+    else:
+        # Fallback: check for inline error text containing 'valid' or 'email' or 'invalid'
+        fallback_locator = page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'valid') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'email') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'invalid')]")
+        expect(fallback_locator).to_be_visible(timeout=5000)
+
+def test_subscribe_with_empty_email_field(test_cases_page: TestCasesPage):
+    """
+    Test 6: Subscribe with empty email field
+    Validates behavior when subscribing without entering email.
+    """
+    page = test_cases_page.page
+    # Ensure empty
+    test_cases_page.subscribe_email_input.fill("")
+    test_cases_page.subscribe_button.click()
+    # Expect browser validationMessage to indicate required field
+    validation_message = test_cases_page.get_subscribe_validation_message()
+    if validation_message:
+        assert len(validation_message) > 0, "Expected required-field validation message when submitting empty email."
+    else:
+        # Fallback: look for inline text mentioning 'required' or 'please enter' etc.
+        fallback_locator = page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'required') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'please enter') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'please')]")
+        expect(fallback_locator).to_be_visible(timeout=5000)
+
+def test_navigate_to_signup_login_page(test_cases_page: TestCasesPage):
+    """
+    Test 7: Navigate to Signup / Login page
+    Validates that the 'Signup / Login' link opens the correct page.
+    """
+    page = test_cases_page.page
+    test_cases_page.signup_login_link.click()
+    # Expect URL to indicate login or signup; fallback to checking presence of login/signup forms
+    expect(page).to_have_url(re.compile(r".*/(login|signup).*", re.IGNORECASE), timeout=10000)
+    # Verify login or signup form visible
+    login_form = page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'login') and (self::form or descendant::form)]")
+    signup_form = page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'signup') and (self::form or descendant::form)]")
+    expect(login_form.or_(signup_form)).to_be_visible(timeout=10000)
+
+def test_navigate_to_api_testing_page(test_cases_page: TestCasesPage):
+    """
+    Test 8: Navigate to API Testing page
+    Validates the API Testing link opens the API Testing section/page.
+    """
+    page = test_cases_page.page
+    test_cases_page.api_testing_link.click()
+    # Expect URL to contain 'api' or page to display 'API Testing' content
+    expect(page).to_have_url(re.compile(r".*api.*", re.IGNORECASE), timeout=10000)
+    expect(page.locator("text=API Testing")).to_be_visible(timeout=10000)
+
+def test_navigate_to_video_tutorials_page(test_cases_page: TestCasesPage):
+    """
+    Test 9: Navigate to Video Tutorials page
+    Validates the Video Tutorials link opens the relevant content.
+    """
+    page = test_cases_page.page
+    test_cases_page.video_tutorials_link.click()
+    # Expect URL or content to indicate video/tutorial presence
+    expect(page).to_have_url(re.compile(r".*(video|tutorial).*", re.IGNORECASE), timeout=10000)
+    # Check for a list of videos or headings
+    video_locator = page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'video') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'tutorial')]")
+    expect(video_locator).to_be_visible(timeout=10000)
+
+def test_open_test_case_1_details(test_cases_page: TestCasesPage):
+    """
+    Test 10: Open Test Case 1: Register User details
+    Validates the detailed content for Test Case 1 is accessible.
+    """
+    page = test_cases_page.page
+    test_cases_page.test_case_1_link.click()
+    # Expect either navigation or in-page anchor reveal; check URL contains anchor or page contains 'Register User' details
+    expect(page).to_have_url(re.compile(r".*(test_case_1|register).*", re.IGNORECASE), timeout=10000)
+    # Verify content that mentions 'Register User' is visible
+    expect(page.locator("text=Register User")).to_be_visible(timeout=10000)
+
+def test_open_test_case_2_details(test_cases_page: TestCasesPage):
+    """
+    Test 11: Open Test Case 2: Login User with correct credentials details
+    Validates Test Case 2 details are shown.
+    """
+    page = test_cases_page.page
+    test_cases_page.test_case_2_link.click()
+    expect(page).to_have_url(re.compile(r".*(test_case_2|login).*", re.IGNORECASE), timeout=10000)
+    expect(page.locator("text=Login User")).to_be_visible(timeout=10000)
+
+def test_open_test_case_3_details(test_cases_page: TestCasesPage):
+    """
+    Test 12: Open Test Case 3: Login User with invalid credentials details
+    Validates Test Case 3 details are shown.
+    """
+    page = test_cases_page.page
+    test_cases_page.test_case_3_link.click()
+    expect(page).to_have_url(re.compile(r".*(test_case_3|login).*", re.IGNORECASE), timeout=10000)
+    expect(page.locator("text=Login User")).to_be_visible(timeout=10000)
+
+def test_navigate_to_cart_and_verify_content(test_cases_page: TestCasesPage):
+    """
+    Test 13: Navigate to Cart page and verify cart content
+    Validates the Cart link opens the cart and the cart shows either an empty state or listed items.
+    """
+    page = test_cases_page.page
+    test_cases_page.cart_link.click()
+    # Expect cart URL
+    expect(page).to_have_url(re.compile(r".*(cart|view_cart).*", re.IGNORECASE), timeout=10000)
+    # Ensure cart header exists
+    # Use heading role detection with regex for 'Cart'
+    try:
+        expect(page.get_by_role("heading", name=re.compile(r"cart", re.IGNORECASE))).to_be_visible(timeout=5000)
+    except Exception:
+        # Fallback: check for any text containing 'cart' at top of page
+        expect(page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'cart')]")).to_be_visible(timeout=5000)
+
+    # Check if there are cart item rows within any tables
+    rows = page.locator("table tbody tr")
+    rows_count = rows.count()
+    if rows_count > 0:
+        # Verify at least one row contains expected columns like product name, quantity, price
+        first_row = rows.nth(0)
+        # Check for product name text presence in the row
+        product_name_cell = first_row.locator("xpath=./td[2] | ./td[1]")
+        expect(product_name_cell).to_be_visible(timeout=5000)
+        # Check for quantity controls or text
+        qty_cell = first_row.locator("xpath=./td[3] | ./td[2]")
+        expect(qty_cell).to_be_visible(timeout=5000)
+    else:
+        # If no rows, expect an empty-cart message
+        empty_locator = page.locator("xpath=//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'your cart is empty') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'cart is empty') or contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'empty cart')]")
+        expect(empty_locator).to_be_visible(timeout=5000)

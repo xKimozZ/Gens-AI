@@ -20,7 +20,15 @@ from parsers.test_parser import (
     summarize_elements_detailed,
     calculate_coverage
 )
-from generators.code_generator import generate_code, apply_custom_instructions
+from generators.code_generator import (
+    generate_code,
+    generate_code_with_llm,
+    apply_custom_instructions,
+    LocatorAnalyzer,
+    CodeValidator,
+    CodeRunner,
+    TestExecutionLog
+)
 
 
 class TestingAgent:
@@ -252,16 +260,65 @@ IMPORTANT: Reference actual elements found (e.g., 'Click Sign in button', 'Navig
         url: str, 
         suite_name: str = "TestSuite", 
         elements: List[Dict] = None, 
-        custom_instructions: str = ""
-    ) -> str:
-        """Phase 3: Generate Playwright Python code with smart locator strategy"""
+        custom_instructions: str = "",
+        use_llm: bool = True,
+        run_tests: bool = False,
+        headless: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Phase 3: Generate Playwright Python code with smart locator strategy.
+        
+        The agent now truly writes code using LLM intelligence with:
+        - Smart locator strategy selection (testid > id > aria > name > text > css)
+        - Self-correction through validation loops AND actual test execution
+        - Detailed execution logs when run_tests=True
+        - Fallback to templates if LLM fails
+        
+        Args:
+            test_cases: List of test case dictionaries
+            url: Target URL
+            suite_name: Name for the test suite
+            elements: List of page elements from exploration
+            custom_instructions: Additional instructions for code generation
+            use_llm: Whether to use LLM for code generation (default: True)
+            run_tests: Whether to actually run tests for verification (default: False)
+            headless: Run browser in headless mode during test execution (default: True)
+        
+        Returns:
+            Dict containing:
+                - code: The generated Python test code
+                - execution_log: TestExecutionLog if run_tests=True, else None
+                - metrics: Generation metrics
+        """
         print(f"\n💻 PHASE 3: Generating code for {len(test_cases)} test cases")
         if custom_instructions:
             print(f"📝 Custom instructions: {custom_instructions[:100]}...")
+        if run_tests:
+            print(f"🧪 Test execution enabled (headless={headless})")
         start_time = time.time()
         
-        # Generate base code
-        base_code = generate_code(test_cases, url, suite_name, elements)
+        execution_log = None
+        
+        if use_llm:
+            # Use LLM-powered generation with self-correction
+            result = generate_code_with_llm(
+                model=self.model,
+                test_cases=test_cases,
+                url=url,
+                suite_name=suite_name,
+                elements=elements,
+                max_retries=2,
+                run_tests=run_tests,
+                headless=headless
+            )
+            # Handle both tuple return (new) and string return (legacy)
+            if isinstance(result, tuple):
+                base_code, execution_log = result
+            else:
+                base_code = result
+        else:
+            # Use template-based fallback
+            base_code = generate_code(test_cases, url, suite_name, elements)
         
         # If custom instructions provided, use LLM to refine the code
         if custom_instructions:
@@ -280,7 +337,13 @@ IMPORTANT: Reference actual elements found (e.g., 'Click Sign in button', 'Navig
         self.metrics_log.append(asdict(metrics))
         
         print(f"✅ Code generation complete in {elapsed:.2f}s")
-        return code
+        
+        # Return comprehensive result
+        return {
+            "code": code,
+            "execution_log": execution_log,
+            "metrics": asdict(metrics)
+        }
     
     def get_metrics(self) -> List[Dict]:
         """Return all collected metrics"""

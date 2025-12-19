@@ -1347,6 +1347,12 @@ async function generateCode() {
     `;
 
   try {
+    // Check if run tests checkbox is enabled
+    const runTestsCheckbox = document.getElementById("runTestsCheckbox");
+    const runTests = runTestsCheckbox ? runTestsCheckbox.checked : false;
+
+    // Note: checkbox listener is initialized on DOMContentLoaded
+
     const response = await fetch(`${API_BASE}/api/generate-code`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1356,6 +1362,8 @@ async function generateCode() {
         suite_name: suite.name,
         elements: suite.exploration?.elements || [],
         custom_instructions: customInstructions,
+        run_tests: runTests,
+        headless: true,
       }),
     });
 
@@ -1364,6 +1372,53 @@ async function generateCode() {
     if (result.success) {
       generatedCode = result.data.code;
       updateMetrics();
+
+      // Display execution log if available
+      const executionLogContainer = document.getElementById(
+        "executionLogContainer"
+      );
+      if (result.data.execution_log) {
+        const log = result.data.execution_log;
+        const statusColor = log.all_passed ? "#4ade80" : "#f87171";
+        const statusIcon = log.all_passed ? "✅" : "⚠️";
+
+        executionLogContainer.style.display = "block";
+        document.getElementById("executionSummary").innerHTML = `
+          <span style="color: ${statusColor}; font-weight: 600;">
+            ${statusIcon} ${log.passed}/${
+          log.total_tests
+        } passed (${log.success_rate.toFixed(1)}%)
+          </span>
+          <span style="margin-left: 10px; color: #888;">⏱️ ${log.duration.toFixed(
+            2
+          )}s</span>
+        `;
+
+        // Build test results HTML
+        let resultsHtml = "";
+        log.test_results.forEach((test) => {
+          const icon = test.passed ? "✅" : "❌";
+          const color = test.passed ? "#4ade80" : "#f87171";
+          resultsHtml += `<div style="padding: 5px 0; border-bottom: 1px solid #333;">
+            <span style="color: ${color};">${icon} ${test.test_name}</span>
+            <span style="color: #888; margin-left: 10px;">(${test.duration.toFixed(
+              2
+            )}s)</span>`;
+          if (!test.passed && test.error_message) {
+            resultsHtml += `<div style="color: #f87171; font-size: 11px; margin-top: 4px; padding-left: 20px;">
+              ${test.error_type}: ${escapeHtml(
+              test.error_message.substring(0, 200)
+            )}
+              ${test.line_number ? `(line ${test.line_number})` : ""}
+            </div>`;
+          }
+          resultsHtml += `</div>`;
+        });
+
+        document.getElementById("executionDetails").innerHTML = resultsHtml;
+      } else {
+        executionLogContainer.style.display = "none";
+      }
 
       // Display code with syntax highlighting
       document.getElementById("codegenDisplay").innerHTML = `
@@ -1383,6 +1438,7 @@ async function generateCode() {
     }
   } catch (error) {
     console.error("Code generation error:", error);
+    document.getElementById("executionLogContainer").style.display = "none";
     document.getElementById("codegenDisplay").innerHTML = `
             <div style="color: #f48771; padding: 20px;">
                 <h3 style="color: #f48771; margin-bottom: 10px;">❌ Error</h3>
@@ -1446,5 +1502,22 @@ document.addEventListener("DOMContentLoaded", () => {
       '📋 Test Suites <span style="background:#dc3545;color:white;border-radius:10px;padding:2px 6px;font-size:10px;margin-left:5px;">' +
       savedTestSuites.length +
       "</span>";
+  }
+
+  // Initialize Run Tests checkbox listener and status element
+  const runTestsCheckbox = document.getElementById("runTestsCheckbox");
+  const runTestsStatus = document.getElementById("runTestsStatus");
+  if (runTestsCheckbox && runTestsStatus) {
+    const updateStatus = (enabled) => {
+      runTestsStatus.textContent = enabled
+        ? "Test execution: Enabled"
+        : "Test execution: Disabled";
+      runTestsStatus.style.color = enabled ? "#4ade80" : "#bbb";
+    };
+    // Set initial status
+    updateStatus(runTestsCheckbox.checked);
+    runTestsCheckbox.addEventListener("change", (e) => {
+      updateStatus(e.target.checked);
+    });
   }
 });
