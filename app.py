@@ -284,6 +284,7 @@ async def generate_code(request: Dict[str, Any]) -> AgentResponse:
     Phase 3: Generate Playwright Python code from test cases
     
     Expects test_cases, url, suite_name, and optional custom_instructions in request body.
+    Optional: run_tests (bool) to enable actual test execution for verification.
     """
     try:
         test_cases = request.get("test_cases", [])
@@ -291,18 +292,60 @@ async def generate_code(request: Dict[str, Any]) -> AgentResponse:
         suite_name = request.get("suite_name", "TestSuite")
         elements = request.get("elements", [])
         custom_instructions = request.get("custom_instructions", "")
+        run_tests = request.get("run_tests", False)  # Enable test execution
+        headless = request.get("headless", True)  # Headless browser mode
         
         if not test_cases:
             raise HTTPException(status_code=400, detail="No test cases provided")
         
-        code = agent_instance.generate_code(test_cases, url, suite_name, elements, custom_instructions)
+        result = agent_instance.generate_code(
+            test_cases, 
+            url, 
+            suite_name, 
+            elements, 
+            custom_instructions,
+            use_llm=True,
+            run_tests=run_tests,
+            headless=headless
+        )
+        
+        # Extract code from result dict
+        code = result.get("code", "") if isinstance(result, dict) else result
+        execution_log = result.get("execution_log") if isinstance(result, dict) else None
         
         # Get latest metrics
         metrics = agent_instance.get_metrics()[-1] if agent_instance.get_metrics() else {}
         
+        # Build response data
+        response_data = {"code": code}
+        
+        # Add execution log if available
+        if execution_log:
+            response_data["execution_log"] = {
+                "total_tests": execution_log.total_tests,
+                "passed": execution_log.passed,
+                "failed": execution_log.failed,
+                "errors": execution_log.errors,
+                "duration": execution_log.duration,
+                "all_passed": execution_log.all_passed,
+                "success_rate": execution_log.success_rate,
+                "test_results": [
+                    {
+                        "test_name": r.test_name,
+                        "passed": r.passed,
+                        "duration": r.duration,
+                        "error_message": r.error_message,
+                        "error_type": r.error_type,
+                        "line_number": r.line_number
+                    }
+                    for r in execution_log.test_results
+                ],
+                "summary": str(execution_log)
+            }
+        
         return AgentResponse(
             success=True,
-            data={"code": code},
+            data=response_data,
             metrics=metrics
         )
     
