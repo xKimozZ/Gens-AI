@@ -69,12 +69,6 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-async def root():
-    """Serve frontend"""
-    return FileResponse("frontend/index.html")
-
-
 @app.post("/api/explore")
 async def explore_page(request: ExploreRequest) -> AgentResponse:
     """
@@ -338,13 +332,9 @@ async def health_check():
     }
 
 
-# Static file serving - MUST be last to not override API routes
-@app.get("/{file_path:path}")
-async def serve_static(file_path: str):
-    """Serve CSS/JS files"""
-    if file_path in ["style.css", "script.js"]:
-        return FileResponse(f"frontend/{file_path}")
-    return {"error": "Not found", "path": file_path}
+# Mount static files directory with proper MIME types
+app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
 
 if __name__ == "__main__":
