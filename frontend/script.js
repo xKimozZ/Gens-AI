@@ -88,7 +88,15 @@ async function exploreUrl() {
       displayExplorationResult(result.data);
       updateMetrics();
       renderExplorationsList();
-      designBtn.disabled = false;
+      
+      // Auto-select in test design dropdown
+      const designSelect = document.getElementById('explorationSelect');
+      if (designSelect) {
+        designSelect.value = exploration.id;
+        designBtn.disabled = false;
+      } else {
+        designBtn.disabled = false;
+      }
     } else {
       throw new Error(result.message || "Exploration failed");
     }
@@ -159,6 +167,13 @@ async function designTests() {
       updateMetrics();
       renderTestSuitesList(); // Update sidebar immediately
       populateReviewSuiteSelector(); // Update review dropdown
+      populateCodegenSuiteSelector(); // Update codegen dropdown
+      
+      // Auto-select the new test suite in Review tab
+      const reviewSelect = document.getElementById('reviewSuiteSelect');
+      if (reviewSelect) {
+        reviewSelect.value = testSuite.id;
+      }
 
       // Show notification badge on Test Suites tab
       document.getElementById("testSuitesTab").innerHTML =
@@ -872,9 +887,10 @@ function switchReviewMode(mode) {
     document.getElementById("reviewEditPanel").style.display = "none";
     document.getElementById("reviewChatPanel").style.display = "flex";
 
-    // Hide edit buttons in chat mode
+    // Hide add button in chat mode, but keep save button visible
     document.getElementById("addTestBtn").style.display = "none";
-    document.getElementById("saveSuiteBtn").style.display = "none";
+    // Keep save button visible in chat mode too
+    document.getElementById("saveSuiteBtn").style.display = "inline-block";
 
     // Enable chat input if suite is selected
     if (currentReviewSuiteId) {
@@ -933,17 +949,28 @@ function loadSuiteForReview() {
   document.getElementById("addTestBtn").disabled = false;
   document.getElementById("saveSuiteBtn").disabled = false;
 
+  // Load chat history for this suite if exists
+  const savedHistory = localStorage.getItem(`chatHistory_${suiteId}`);
+  if (savedHistory) {
+    chatHistory = JSON.parse(savedHistory);
+  }
+
   // Enable chat if in chat mode
   if (reviewMode === "chat") {
     document.getElementById("sendChatBtn").disabled = false;
-    // Clear chat display
-    document.getElementById("chatMessages").innerHTML = `
+    // Restore or show placeholder
+    if (chatHistory.length > 0) {
+      document.getElementById("chatMessages").innerHTML = "";
+      chatHistory.forEach(msg => addChatMessage(msg.role, msg.content));
+    } else {
+      document.getElementById("chatMessages").innerHTML = `
             <div style="color: #6c757d; text-align: center; padding: 40px 20px;">
                 <div style="font-size: 48px; margin-bottom: 20px;">💬</div>
                 <div style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">AI Chat Mode</div>
                 <div style="font-size: 14px;">Ask me to add, modify, or remove tests</div>
             </div>
         `;
+    }
   }
 
   renderEditableTests();
@@ -1363,6 +1390,17 @@ async function generateCode() {
 
     if (result.success) {
       generatedCode = result.data.code;
+      
+      // Clean up code formatting if it contains escaped newlines
+      if (typeof generatedCode === 'string' && generatedCode.includes('\\n')) {
+        console.log('[CODE GEN] Detected escaped newlines, converting to actual line breaks');
+        // Replace escaped newlines with actual newlines
+        generatedCode = generatedCode.replace(/\\n/g, '\n');
+        // Replace escaped quotes if present
+        generatedCode = generatedCode.replace(/\\'/g, "'");
+        generatedCode = generatedCode.replace(/\\"/g, '"');
+      }
+      
       updateMetrics();
 
       // Display code with syntax highlighting
