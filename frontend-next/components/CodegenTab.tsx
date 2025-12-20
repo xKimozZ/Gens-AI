@@ -284,9 +284,10 @@ export default function CodegenTab() {
             padding: "15px",
             marginBottom: "15px",
             flexShrink: 0,
-            maxHeight: "300px",
+            maxHeight: "400px",
             display: "flex",
             flexDirection: "column",
+            overflow: "hidden",
           }}
         >
           <div
@@ -327,7 +328,14 @@ export default function CodegenTab() {
 
           {executionLog.test_results &&
             executionLog.test_results.length > 0 && (
-              <div style={{ marginTop: "10px", overflowY: "auto", flex: 1 }}>
+              <div
+                style={{
+                  marginTop: "10px",
+                  overflowY: "auto",
+                  flex: 1,
+                  minHeight: 0,
+                }}
+              >
                 {executionLog.test_results.map((test: any, idx: number) => (
                   <div
                     key={idx}
@@ -667,7 +675,7 @@ export default function CodegenTab() {
       <div
         style={{
           flex: 1,
-          overflow: "hidden",
+          overflow: "auto",
           background: "#2d2d2d",
           borderRadius: "8px",
           padding: "20px",
