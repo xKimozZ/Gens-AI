@@ -110,7 +110,7 @@ export default function CodegenTab() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-auto overflow-scroll">
       {/* Controls */}
       <div
         style={{
@@ -675,10 +675,11 @@ export default function CodegenTab() {
       <div
         style={{
           flex: 1,
-          overflow: "auto",
+          //overflow: "auto",
           background: "#2d2d2d",
           borderRadius: "8px",
           padding: "20px",
+          maxHeight: "400px",
         }}
       >
         {generatedCode ? (

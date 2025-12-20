@@ -119,6 +119,8 @@ class PageExplorerTool(Tool):
                             "text": text_content[:100] if text_content else "",
                             "type": await el.get_attribute("type") or "",
                             "id": await el.get_attribute("id") or "",
+                            "data-qa": await el.get_attribute("data-qa") or "",
+                            "data-testid": await el.get_attribute("data-testid") or "",
                             "name": await el.get_attribute("name") or "",
                             "visible": await el.is_visible(),
                         }
@@ -132,10 +134,14 @@ class PageExplorerTool(Tool):
     
     async def _determine_best_locator(self, element) -> str:
         """Determine the most reliable locator for an element"""
-        # Priority: testid > id > name > aria-label > text > css
+        # Priority: testid > data-qa > id > name > aria-label > text > css
         test_id = await element.get_attribute("data-testid")
         if test_id:
             return f"[data-testid='{test_id}']"
+        
+        data_qa = await element.get_attribute("data-qa")
+        if data_qa:
+            return f"[data-qa='{data_qa}']"
         
         elem_id = await element.get_attribute("id")
         if elem_id:
@@ -149,6 +155,7 @@ class PageExplorerTool(Tool):
         if aria_label:
             return f"[aria-label='{aria_label}']"
         
+
         try:
             text_content = await element.inner_text()
             if text_content:

@@ -202,9 +202,12 @@ def summarize_elements_detailed(elements: List[Dict]) -> str:
             inp_type = inp.get('type', 'text')
             inp_id = inp.get('id', '')
             inp_name = inp.get('name', '')
+            inp_qa = inp.get('data-qa', '')
             parts = [f"type='{inp_type}'"]
             if inp_id:
                 parts.append(f"id='{inp_id}'")
+            if inp_qa:
+                parts.append(f"data-qa='{inp_qa}'")
             if inp_name:
                 parts.append(f"name='{inp_name}'")
             summary.append(f"  {i}. Input: {', '.join(parts)}")

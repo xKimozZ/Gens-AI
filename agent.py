@@ -3,7 +3,7 @@ Web Testing Agent - Core Logic
 Handles exploration and test design phases using smolagents framework.
 LLM is hot-swappable via MODEL_PROVIDER environment variable.
 
-This is the main entry point. The code has been refactored into modules:
+This is the main entry point:
 - models.py: Data classes (Metrics, ExplorationResult, TestDesignResult)
 - core/llm_provider.py: LLM initialization
 - core/testing_agent.py: Main TestingAgent class
