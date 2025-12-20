@@ -7,8 +7,6 @@ and self-correction capabilities.
 import os
 import re
 import subprocess
-import tempfile
-import shutil
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 from enum import Enum
@@ -212,6 +210,9 @@ class TestResult:
     error_message: str = ""
     error_type: str = ""
     line_number: Optional[int] = None
+    screenshot_path: Optional[str] = None  # Path to screenshot (failure or final)
+    video_path: Optional[str] = None  # Path to video recording
+    action_log_path: Optional[str] = None  # Path to action log JSON
     
     def __str__(self):
         status = "✅ PASSED" if self.passed else "❌ FAILED"
@@ -225,7 +226,7 @@ class TestResult:
 
 @dataclass
 class TestExecutionLog:
-    """Complete log of test execution"""
+    """Complete log of test execution with verification evidence"""
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     code_file: str = ""
     total_tests: int = 0
@@ -238,6 +239,11 @@ class TestExecutionLog:
     stdout: str = ""
     stderr: str = ""
     return_code: int = 0
+    # Evidence paths for verification
+    evidence_dir: str = ""  # Base directory for all evidence
+    screenshots: List[str] = field(default_factory=list)  # All screenshot paths
+    videos: List[str] = field(default_factory=list)  # All video paths
+    action_logs: List[str] = field(default_factory=list)  # All action log paths
     
     @property
     def all_passed(self) -> bool:
@@ -298,17 +304,28 @@ class TestExecutionLog:
 class CodeRunner:
     """Executes generated test code and captures results"""
     
-    def __init__(self, timeout: int = 120, headless: bool = True):
+    def __init__(self, timeout: int = 120, headless: bool = True, tests_dir: str = None):
         """
         Initialize the code runner.
         
         Args:
             timeout: Maximum time in seconds to run tests
             headless: Whether to run browser in headless mode
+            tests_dir: Directory to save test files (default: ./tests/)
         """
         self.timeout = timeout
         self.headless = headless
-        self.temp_dir = None
+        # Use project's tests/ directory by default
+        if tests_dir:
+            self.tests_dir = tests_dir
+        else:
+            # Get the directory where this module is located and go up to project root
+            module_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(module_dir)
+            self.tests_dir = os.path.join(project_root, "tests")
+        
+        # Ensure tests directory exists
+        os.makedirs(self.tests_dir, exist_ok=True)
     
     def run_tests(self, code: str, test_file_name: str = "test_generated.py") -> TestExecutionLog:
         """
@@ -316,42 +333,88 @@ class CodeRunner:
         
         Args:
             code: The Python test code to execute
-            test_file_name: Name for the temporary test file
+            test_file_name: Name for the test file
             
         Returns:
             TestExecutionLog with detailed results
         """
         log = TestExecutionLog()
         
-        # Create temporary directory for test execution
-        self.temp_dir = tempfile.mkdtemp(prefix="playwright_test_")
-        test_file_path = os.path.join(self.temp_dir, test_file_name)
+        # Save test file in tests/ directory
+        test_file_path = os.path.join(self.tests_dir, test_file_name)
         log.code_file = test_file_path
         
         try:
-            # Write code to temp file
+            # Write code to test file
             with open(test_file_path, 'w', encoding='utf-8') as f:
                 f.write(code)
+            
+            # Create conftest.py with Playwright fixtures if not exists
+            conftest_path = os.path.join(self.tests_dir, 'conftest.py')
+            if not os.path.exists(conftest_path):
+                conftest_content = '''"""Pytest configuration with Playwright fixtures."""
+import pytest
+from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
+import os
+
+
+@pytest.fixture(scope="session")
+def browser():
+    """Create a browser instance for the test session."""
+    headless = os.environ.get("PWHEADLESS", "1") == "1" or os.environ.get("HEADLESS", "1") == "1"
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=headless)
+        yield browser
+        browser.close()
+
+
+@pytest.fixture(scope="function")
+def context(browser: Browser):
+    """Create a new browser context for each test."""
+    context = browser.new_context()
+    yield context
+    context.close()
+
+
+@pytest.fixture(scope="function")
+def page(context: BrowserContext) -> Page:
+    """Create a new page for each test."""
+    page = context.new_page()
+    yield page
+    page.close()
+'''
+                with open(conftest_path, 'w', encoding='utf-8') as f:
+                    f.write(conftest_content)
+                print(f"📄 Created conftest.py with Playwright fixtures")
             
             print(f"\n🧪 RUNNING TESTS")
             print(f"📁 Test file: {test_file_path}")
             print("-" * 50)
             
-            # Build pytest command
+            # Build pytest command - run from project root for proper imports
+            project_root = os.path.dirname(self.tests_dir)
+            
             cmd = [
                 "python", "-m", "pytest",
                 test_file_path,
                 "-v",  # Verbose output
                 "--tb=short",  # Short traceback
-                f"--timeout={self.timeout}",  # Test timeout
-                "--no-header",  # Cleaner output
+                "--color=no",  # No ANSI colors for easier parsing
+                "--continue-on-collection-errors",  # Continue even if some tests fail to collect
             ]
             
-            # Add headless flag via environment
+            # Add headless flag and video recording via environment
             env = os.environ.copy()
             if self.headless:
                 env["PWHEADLESS"] = "1"
                 env["HEADLESS"] = "1"
+                env["PLAYWRIGHT_HEADLESS"] = "1"
+            # Enable video recording for evidence
+            env["RECORD_VIDEO"] = "1"
+            
+            print(f"🔧 Running: {' '.join(cmd)}")
+            print(f"📂 Working dir: {project_root}")
+            print(f"📹 Video recording: Enabled")
             
             # Run pytest
             start_time = datetime.now()
@@ -361,7 +424,7 @@ class CodeRunner:
                 text=True,
                 timeout=self.timeout + 30,  # Extra buffer for pytest overhead
                 env=env,
-                cwd=self.temp_dir
+                cwd=project_root  # Run from project root
             )
             end_time = datetime.now()
             
@@ -370,10 +433,18 @@ class CodeRunner:
             log.stderr = result.stderr
             log.return_code = result.returncode
             
+            # Debug: print raw output
+            print(f"\n📜 STDOUT:\n{result.stdout[:2000]}")
+            if result.stderr:
+                print(f"\n📜 STDERR:\n{result.stderr[:1000]}")
+            
             # Parse results
             self._parse_pytest_output(result.stdout, result.stderr, log)
             
-            # Print log
+            # Collect evidence files
+            self._collect_evidence(log)
+            
+            # Print log summary
             print(str(log))
             
         except subprocess.TimeoutExpired:
@@ -387,61 +458,167 @@ class CodeRunner:
             print(f"❌ Error running tests: {e}")
             import traceback
             traceback.print_exc()
-            
-        finally:
-            # Cleanup temp directory
-            if self.temp_dir and os.path.exists(self.temp_dir):
-                try:
-                    shutil.rmtree(self.temp_dir)
-                except Exception:
-                    pass
+        
+        # Note: We keep the test file in tests/ for inspection, not deleting it
+        print(f"📁 Test file saved at: {test_file_path}")
         
         return log
     
+    def _collect_evidence(self, log: TestExecutionLog):
+        """Collect screenshots, videos, and action logs from evidence directory."""
+        import glob
+        import json
+        
+        evidence_base = os.path.join(self.tests_dir, "evidence")
+        if not os.path.exists(evidence_base):
+            print("📂 No evidence directory found")
+            return
+        
+        # Find the most recent run directory
+        run_dirs = sorted(glob.glob(os.path.join(evidence_base, "run_*")), reverse=True)
+        if not run_dirs:
+            print("📂 No test run evidence found")
+            return
+        
+        latest_run = run_dirs[0]
+        log.evidence_dir = latest_run
+        print(f"📂 Evidence directory: {latest_run}")
+        
+        # Collect screenshots
+        screenshots_dir = os.path.join(latest_run, "screenshots")
+        if os.path.exists(screenshots_dir):
+            log.screenshots = glob.glob(os.path.join(screenshots_dir, "*.png"))
+            print(f"📸 Found {len(log.screenshots)} screenshots")
+            
+            # Match screenshots to test results
+            for result in log.test_results:
+                # Look for failure screenshot first, then final screenshot
+                fail_screenshot = os.path.join(screenshots_dir, f"{result.test_name}_FAILED.png")
+                final_screenshot = os.path.join(screenshots_dir, f"{result.test_name}_final.png")
+                
+                if os.path.exists(fail_screenshot):
+                    result.screenshot_path = fail_screenshot
+                elif os.path.exists(final_screenshot):
+                    result.screenshot_path = final_screenshot
+        
+        # Collect videos
+        videos_dir = os.path.join(latest_run, "videos")
+        if os.path.exists(videos_dir):
+            log.videos = glob.glob(os.path.join(videos_dir, "*.webm"))
+            print(f"📹 Found {len(log.videos)} videos")
+            
+            # Try to match videos to test results (videos are named by context ID)
+            for result in log.test_results:
+                # Videos might have different naming, try to match by test name
+                for video in log.videos:
+                    if result.test_name.lower() in os.path.basename(video).lower():
+                        result.video_path = video
+                        break
+        
+        # Collect action logs
+        logs_dir = os.path.join(latest_run, "logs")
+        if os.path.exists(logs_dir):
+            log.action_logs = glob.glob(os.path.join(logs_dir, "*.json"))
+            print(f"📋 Found {len(log.action_logs)} action logs")
+            
+            # Match action logs to test results
+            for result in log.test_results:
+                action_log = os.path.join(logs_dir, f"{result.test_name}_actions.json")
+                if os.path.exists(action_log):
+                    result.action_log_path = action_log
+        
+        # Load and print summary if exists
+        summary_path = os.path.join(latest_run, "summary.json")
+        if os.path.exists(summary_path):
+            try:
+                with open(summary_path) as f:
+                    summary = json.load(f)
+                print(f"📊 Evidence summary: {len(summary.get('screenshots', []))} screenshots, "
+                      f"{len(summary.get('videos', []))} videos, {len(summary.get('logs', []))} logs")
+            except Exception:
+                pass
+
     def _parse_pytest_output(self, stdout: str, stderr: str, log: TestExecutionLog):
         """Parse pytest output to extract test results"""
         
-        # Parse individual test results from verbose output
-        # Pattern: test_file.py::TestClass::test_name PASSED/FAILED
-        test_pattern = r'(test_\w+)\s+(PASSED|FAILED|ERROR|SKIPPED)'
+        combined_output = stdout + "\n" + stderr
         
-        for match in re.finditer(test_pattern, stdout, re.IGNORECASE):
-            test_name = match.group(1)
-            status = match.group(2).upper()
-            
-            result = TestResult(
-                test_name=test_name,
-                passed=(status == "PASSED"),
-                error_type="" if status == "PASSED" else status
-            )
-            
-            log.test_results.append(result)
-            
-            if status == "PASSED":
-                log.passed += 1
-            elif status == "FAILED":
-                log.failed += 1
-            elif status == "ERROR":
-                log.errors += 1
-            elif status == "SKIPPED":
-                log.skipped += 1
+        # Debug: check for collection errors
+        if "collected 0 items" in combined_output:
+            print("⚠️ No tests were collected by pytest!")
+            if "error" in combined_output.lower() or "Error" in combined_output:
+                # Extract the error message
+                error_lines = [line for line in combined_output.split('\n') if 'error' in line.lower() or 'Error' in line]
+                for line in error_lines[:5]:
+                    print(f"   {line}")
+        
+        # Parse individual test results from verbose output
+        # Pattern matches: tests/test_file.py::TestClass::test_name PASSED/FAILED
+        # or: test_file.py::test_name PASSED
+        test_patterns = [
+            r'::?(test_\w+)\s+(PASSED|FAILED|ERROR|SKIPPED)',  # Standard format
+            r'(test_\w+)\s+(PASSED|FAILED|ERROR|SKIPPED)',     # Simple format
+            r'::(test_\w+)\[.*?\]\s+(PASSED|FAILED|ERROR|SKIPPED)',  # Parameterized tests
+        ]
+        
+        found_tests = set()
+        for pattern in test_patterns:
+            for match in re.finditer(pattern, stdout, re.IGNORECASE):
+                test_name = match.group(1)
+                status = match.group(2).upper()
+                
+                if test_name in found_tests:
+                    continue
+                found_tests.add(test_name)
+                
+                result = TestResult(
+                    test_name=test_name,
+                    passed=(status == "PASSED"),
+                    error_type="" if status == "PASSED" else status
+                )
+                
+                log.test_results.append(result)
+                
+                if status == "PASSED":
+                    log.passed += 1
+                elif status == "FAILED":
+                    log.failed += 1
+                elif status == "ERROR":
+                    log.errors += 1
+                elif status == "SKIPPED":
+                    log.skipped += 1
         
         log.total_tests = len(log.test_results)
         
         # If no tests were found via pattern, try summary line
+        # e.g., "1 passed", "2 failed, 1 passed", "3 passed in 2.5s"
         if log.total_tests == 0:
-            summary_pattern = r'(\d+)\s+passed|(\d+)\s+failed|(\d+)\s+error'
-            for match in re.finditer(summary_pattern, stdout, re.IGNORECASE):
-                if match.group(1):
-                    log.passed = int(match.group(1))
-                if match.group(2):
-                    log.failed = int(match.group(2))
-                if match.group(3):
-                    log.errors = int(match.group(3))
+            print("⚠️ No tests found via pattern matching, trying summary...")
+            summary_matches = {
+                'passed': re.search(r'(\d+)\s+passed', combined_output),
+                'failed': re.search(r'(\d+)\s+failed', combined_output),
+                'error': re.search(r'(\d+)\s+error', combined_output),
+            }
+            
+            if summary_matches['passed']:
+                log.passed = int(summary_matches['passed'].group(1))
+            if summary_matches['failed']:
+                log.failed = int(summary_matches['failed'].group(1))
+            if summary_matches['error']:
+                log.errors = int(summary_matches['error'].group(1))
+                
             log.total_tests = log.passed + log.failed + log.errors + log.skipped
+            
+            # Create placeholder results for summary-only parsing
+            for i in range(log.passed):
+                log.test_results.append(TestResult(test_name=f"test_{i+1}", passed=True))
+            for i in range(log.failed):
+                log.test_results.append(TestResult(test_name=f"failed_test_{i+1}", passed=False, error_type="FAILED"))
         
         # Extract error details from failures
-        self._extract_error_details(stdout + "\n" + stderr, log)
+        self._extract_error_details(combined_output, log)
+        
+        print(f"📊 Parsed results: {log.passed} passed, {log.failed} failed, {log.errors} errors")
     
     def _extract_error_details(self, output: str, log: TestExecutionLog):
         """Extract detailed error information from pytest output"""
@@ -487,7 +664,7 @@ def generate_code_with_llm(
     url: str,
     suite_name: str = "TestSuite",
     elements: List[Dict] = None,
-    max_retries: int = 2,
+    max_retries: int = 5,
     run_tests: bool = True,
     headless: bool = True
 ) -> Tuple[str, Optional[TestExecutionLog]]:

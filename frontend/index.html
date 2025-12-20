@@ -9,12 +9,37 @@
   <body>
     <div class="container">
       <div class="main-panel">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          "
+        >
           <div>
             <h1>🤖 Web Testing Agent</h1>
             <p class="subtitle">AI-powered test exploration and design</p>
           </div>
-          <button onclick="resetAgent()" class="btn-danger" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px;">🔄 Reset Agent</button>
+          <button
+            onclick="resetAgent()"
+            class="btn-danger"
+            style="
+              padding: 10px 20px;
+              background: #dc3545;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              font-size: 13px;
+              cursor: pointer;
+              font-weight: 600;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
+          >
+            🔄 Reset Agent
+          </button>
         </div>
 
         <!-- Tabs Navigation -->
@@ -44,7 +69,10 @@
         <!-- Tab Content -->
         <div class="tab-content" id="tab-explorations">
           <!-- Exploration Input Section -->
-          <div class="input-section" style="margin-bottom: 15px; flex-shrink: 0;">
+          <div
+            class="input-section"
+            style="margin-bottom: 15px; flex-shrink: 0"
+          >
             <input
               type="text"
               id="urlInput"
@@ -113,11 +141,7 @@
             <!-- Exploration Display Area -->
             <div
               id="explorationDisplay"
-              style="
-                overflow-y: auto;
-                padding: 0 10px;
-                min-height: 0;
-              "
+              style="overflow-y: auto; padding: 0 10px; min-height: 0"
             >
               <div
                 style="color: #6c757d; text-align: center; padding: 60px 20px"
@@ -138,11 +162,29 @@
 
         <div class="tab-content" id="tab-testsuites" style="display: none">
           <!-- Test Design Controls -->
-          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
-            <label style="font-size: 13px; color: #667eea; font-weight: 600;">Test Count:</label>
+          <div
+            style="
+              background: #f8f9fa;
+              padding: 15px;
+              border-radius: 8px;
+              margin-bottom: 15px;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              flex-shrink: 0;
+            "
+          >
+            <label style="font-size: 13px; color: #667eea; font-weight: 600"
+              >Test Count:</label
+            >
             <select
               id="testCountSelect"
-              style="padding: 8px 12px; border-radius: 6px; border: 1px solid #e0e0e0; font-size: 13px;"
+              style="
+                padding: 8px 12px;
+                border-radius: 6px;
+                border: 1px solid #e0e0e0;
+                font-size: 13px;
+              "
             >
               <option value="5">5 tests</option>
               <option value="8">8 tests</option>
@@ -151,9 +193,27 @@
               <option value="15">15 tests</option>
               <option value="20">20 tests</option>
             </select>
-            <button onclick="designTests()" id="designBtn" disabled style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 600;">📋 Design Tests</button>
-            <div style="flex: 1;"></div>
-            <span style="font-size: 12px; color: #6c757d;">💡 Select an exploration from the Explorations tab first</span>
+            <button
+              onclick="designTests()"
+              id="designBtn"
+              disabled
+              style="
+                padding: 10px 20px;
+                background: #667eea;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 13px;
+                cursor: pointer;
+                font-weight: 600;
+              "
+            >
+              📋 Design Tests
+            </button>
+            <div style="flex: 1"></div>
+            <span style="font-size: 12px; color: #6c757d"
+              >💡 Select an exploration from the Explorations tab first</span
+            >
           </div>
 
           <div
@@ -214,11 +274,7 @@
             <!-- Test Suite Display Area -->
             <div
               id="testSuiteDisplay"
-              style="
-                overflow-y: auto;
-                padding: 0 10px;
-                min-height: 0;
-              "
+              style="overflow-y: auto; padding: 0 10px; min-height: 0"
             >
               <div
                 style="color: #6c757d; text-align: center; padding: 60px 20px"
@@ -660,7 +716,6 @@
             </div>
           </div>
         </div>
-
       </div>
 
       <div class="metrics-panel">
@@ -696,13 +751,13 @@
     <script src="js/api.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/metrics.js"></script>
-    
+
     <!-- UI modules - load after core -->
     <script src="js/ui/explore.js"></script>
     <script src="js/ui/design.js"></script>
     <script src="js/ui/review.js"></script>
     <script src="js/ui/codegen.js"></script>
-    
+
     <!-- Main app - load last -->
     <script src="js/main.js"></script>
   </body>
