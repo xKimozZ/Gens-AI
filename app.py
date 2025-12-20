@@ -496,24 +496,55 @@ Provide a detailed analysis including:
 4. Any patterns in the failures"""
 
         elif action == "refactor":
-            prompt = f"""Refactor the following test code based on the execution results and user feedback:
+            # Read the actual test file from disk
+            import os
+            test_file_path = os.path.join(os.path.dirname(__file__), "tests", "test_generated.py")
+            actual_code = code  # fallback to provided code
+            if os.path.exists(test_file_path):
+                with open(test_file_path, "r", encoding="utf-8") as f:
+                    actual_code = f.read()
+            
+            # Extract only the failing test names
+            failing_tests = []
+            for r in execution_log.get('test_results', []):
+                if not r.get('passed'):
+                    failing_tests.append({
+                        "name": r.get('test_name'),
+                        "error_type": r.get('error_type'),
+                        "error_message": r.get('error_message'),
+                        "line_number": r.get('line_number')
+                    })
+            
+            failing_tests_info = "\n".join([
+                f"- {t['name']}: {t['error_type']} - {t['error_message'][:300] if t['error_message'] else 'No message'}"
+                for t in failing_tests
+            ])
+            
+            prompt = f"""Refactor ONLY the failing test functions in the code below. DO NOT modify passing tests.
 
-Current Code:
+Current Test File:
 ```python
-{code[:5000]}
+{actual_code}
 ```
 
 {test_results_summary}
 
+FAILING TESTS TO FIX:
+{failing_tests_info}
+
 User Feedback:
 {critique}
 
-Requirements:
-1. Fix the failing tests based on the error messages
-2. Address the user's feedback
-3. Improve locator reliability if needed
-4. Add better error handling
-5. Return ONLY the complete refactored Python code, no explanations"""
+CRITICAL REQUIREMENTS:
+1. Keep ALL passing tests EXACTLY as they are - do not modify them at all
+2. Only refactor the failing test functions listed above
+3. Fix locator issues, timing problems, or assertion errors based on the error messages
+4. Improve reliability with better waits or more robust locators
+5. Return the COMPLETE Python file with:
+   - All imports unchanged
+   - All passing test functions unchanged
+   - Only the failing test functions modified
+6. Return ONLY the Python code, no explanations or markdown"""
 
         elif action == "explain":
             prompt = f"""Explain the test execution results in simple terms:
@@ -552,12 +583,33 @@ Provide a clear, user-friendly explanation of:
         else:
             response_text = str(result)
         
+        # For refactor action, clean up the code and save to file
+        refactored_code = None
+        if action == "refactor":
+            # Extract Python code from markdown if present
+            import re
+            code_match = re.search(r'```python\s*(.*?)\s*```', response_text, re.DOTALL)
+            if code_match:
+                refactored_code = code_match.group(1).strip()
+            else:
+                # Assume the whole response is code
+                refactored_code = response_text.strip()
+            
+            # Save the refactored code to the test file
+            test_file_path = os.path.join(os.path.dirname(__file__), "tests", "test_generated.py")
+            try:
+                with open(test_file_path, "w", encoding="utf-8") as f:
+                    f.write(refactored_code)
+                print(f"✅ Refactored code saved to {test_file_path}")
+            except Exception as save_error:
+                print(f"⚠️ Could not save refactored code: {save_error}")
+        
         return AgentResponse(
             success=True,
             data={
                 "action": action,
                 "response": response_text,
-                "refactored_code": response_text if action == "refactor" else None
+                "refactored_code": refactored_code
             },
             metrics={}
         )

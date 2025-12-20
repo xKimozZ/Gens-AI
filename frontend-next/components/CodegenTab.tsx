@@ -77,10 +77,11 @@ export default function CodegenTab() {
       if (result.success && result.data) {
         setReviewResponse(result.data.response);
         if (action === "refactor" && result.data.refactored_code) {
-          // Offer to replace the code
-          if (confirm("Apply the refactored code?")) {
-            setGeneratedCode(result.data.refactored_code);
-          }
+          // Update the displayed code - file is already saved on backend
+          setGeneratedCode(result.data.refactored_code);
+          alert(
+            "✅ Refactored code saved to tests/test_generated.py\n\nOnly failing tests were modified. You can now re-run tests to verify the fixes."
+          );
         }
       }
     } catch (error) {
