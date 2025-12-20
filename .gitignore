@@ -1,6 +1,12 @@
 .env
 __pycache__/
 tests/
+.github/copilot-instructions.md
+test_eng.py
+frontend-next/.next/
+frontend-next/.env.local
+frontend-next/next-env.d.ts
+frontend-next/node_modules/
 frontend-next/node_modules/
 frontend-next/.next/
 frontend-next/out/
