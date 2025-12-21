@@ -140,7 +140,12 @@ export async function apiReviewTests(
   critique: string,
   action: "analyze" | "refactor" | "explain" = "analyze"
 ): Promise<
-  ApiResponse<{ action: string; response: string; refactored_code?: string }>
+  ApiResponse<{
+    new_execution_log?: any;
+    action: string;
+    response: string;
+    refactored_code?: string;
+  }>
 > {
   const response = await fetch(`${API_BASE_URL}/api/review-tests`, {
     method: "POST",

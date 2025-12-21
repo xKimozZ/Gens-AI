@@ -585,6 +585,7 @@ Provide a clear, user-friendly explanation of:
         
         # For refactor action, clean up the code and save to file
         refactored_code = None
+        new_execution_log = None
         if action == "refactor":
             # Extract Python code from markdown if present
             import re
@@ -601,15 +602,72 @@ Provide a clear, user-friendly explanation of:
                 with open(test_file_path, "w", encoding="utf-8") as f:
                     f.write(refactored_code)
                 print(f"✅ Refactored code saved to {test_file_path}")
+                
+                # Run the tests again to verify the fixes
+                print(f"🧪 Running refactored tests to verify fixes...")
+                from generators.code_generator import CodeRunner
+                runner = CodeRunner(timeout=120, headless=True)
+                log = runner.run_tests(refactored_code)
+                
+                # Convert TestExecutionLog to dict for JSON response
+                new_execution_log = {
+                    "timestamp": log.timestamp,
+                    "total_tests": log.total_tests,
+                    "passed": log.passed,
+                    "failed": log.failed,
+                    "errors": log.errors,
+                    "duration": log.duration,
+                    "all_passed": log.all_passed,
+                    "success_rate": log.success_rate,
+                    "evidence_dir": log.evidence_dir,
+                    "test_results": []
+                }
+                
+                # Convert each test result, including evidence URLs
+                for r in log.test_results:
+                    result_dict = {
+                        "test_name": r.test_name,
+                        "passed": r.passed,
+                        "duration": r.duration,
+                        "error_type": r.error_type,
+                        "error_message": r.error_message,
+                        "line_number": r.line_number,
+                    }
+                    
+                    # Add evidence URLs if available
+                    if r.screenshot_path and os.path.exists(r.screenshot_path):
+                        # Convert file path to API URL
+                        rel_path = os.path.relpath(r.screenshot_path, os.path.join(os.path.dirname(__file__), "tests", "evidence"))
+                        parts = rel_path.replace("\\", "/").split("/")
+                        if len(parts) >= 3:
+                            run_id = parts[0]
+                            filename = parts[-1]
+                            result_dict["screenshot_url"] = f"/api/evidence/{run_id}/screenshots/{filename}"
+                    
+                    if r.video_path and os.path.exists(r.video_path):
+                        rel_path = os.path.relpath(r.video_path, os.path.join(os.path.dirname(__file__), "tests", "evidence"))
+                        parts = rel_path.replace("\\", "/").split("/")
+                        if len(parts) >= 3:
+                            run_id = parts[0]
+                            filename = parts[-1]
+                            result_dict["video_url"] = f"/api/evidence/{run_id}/videos/{filename}"
+                    
+                    new_execution_log["test_results"].append(result_dict)
+                
+                print(f"📊 Refactored test results: {log.passed}/{log.total_tests} passed ({log.success_rate:.1f}%)")
+                
             except Exception as save_error:
-                print(f"⚠️ Could not save refactored code: {save_error}")
+                print(f"⚠️ Error during refactor: {save_error}")
+                import traceback
+                traceback.print_exc()
         
         return AgentResponse(
             success=True,
             data={
                 "action": action,
                 "response": response_text,
-                "refactored_code": refactored_code
+                "refactored_code": refactored_code,
+                "new_execution_log": new_execution_log
             },
             metrics={}
         )

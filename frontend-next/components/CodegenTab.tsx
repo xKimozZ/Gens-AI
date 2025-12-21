@@ -79,9 +79,24 @@ export default function CodegenTab() {
         if (action === "refactor" && result.data.refactored_code) {
           // Update the displayed code - file is already saved on backend
           setGeneratedCode(result.data.refactored_code);
-          alert(
-            "✅ Refactored code saved to tests/test_generated.py\n\nOnly failing tests were modified. You can now re-run tests to verify the fixes."
-          );
+
+          // Update execution log with new test results if available
+          if (result.data.new_execution_log) {
+            const newLog = result.data.new_execution_log;
+            const oldPassed = executionLog?.passed || 0;
+            const improvement = newLog.passed - oldPassed;
+            setExecutionLog(newLog);
+            const status = newLog.all_passed
+              ? "🎉 All tests now pass!"
+              : `${improvement > 0 ? `+${improvement} tests fixed. ` : ""}${
+                  newLog.passed
+                }/${newLog.total_tests} passing.`;
+            alert(
+              `✅ Refactored code saved and tests re-run!\n\n${status}\n\nCheck the updated Test Execution Results below.`
+            );
+          } else {
+            alert("✅ Refactored code saved to tests/test_generated.py");
+          }
         }
       }
     } catch (error) {
